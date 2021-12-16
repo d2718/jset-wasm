@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+body { background-color: #888888; }
+div#dbg {
+    white-space: pre;
+    font-family: monospace;
+}
+div#status {
+    position: fixed;
+    top: 1em; left: 1em;
+    z-index: 3;
+    display: none;
+    background-color: #bbbbbb;
+    border: 1em solid #444444;
+    border-radius: 1em;
+    padding: 1em;
+}
+canvas { z-index: 1; }
+    </style>
+</head>
+<body>
+    <div id="status"></div>
+    <canvas id="demo-canvas"></canvas><br>
+    <button type="button" id="unzoom">
+        <label for="unzoom">Zoom Out</label>
+    </button>
+    
+    <div id="dbg"></div>
+    
+    <script type="module">
+
+function recursive_clear(elt) {
+    while (elt.firstChild) {
+        recursive_clear(elt.lastChild);
+        elt.removeChild(elt.lastChild);
+    }
+}
+
+let jswmod = null;
+const CANVAS = document.getElementById("demo-canvas");
+const STATUS = {
+    set: function(txt) {
+        const div = document.getElementById("status");
+        console.log(`Setting status: "${txt}"`);
+        div.appendChild(document.createTextNode(txt));
+        div.style.display = "inline-block";
+    },
+    hide: function() {
+        const div = document.getElementById("status");
+        console.log("hiding status...")
+        div.style.display = "none";
+        recursive_clear(div);
+    },
+};
+        
+const DEFAULT_PARAMS = {
+    x_pixels: 1200,
+    y_pixels: 800,
+    x: -2.0,
+    y: 1.0,
+    width: 3.0
+};
+let current_params = DEFAULT_PARAMS;
+
+function dbg(txt) {
+    let dd = document.getElementById("dbg");
+    dd.innerHTML = txt;
+}
+
+function render_image(params) {
+    STATUS.set("Drawing...");
+    
+    CANVAS.width = params.x_pixels;
+    CANVAS.height = params.y_pixels;
+    
+    const buff_addr = jswmod.exports.BUFFER.value;
+    const img_data = new ImageData(
+        new Uint8ClampedArray(
+            jswmod.exports.memory.buffer,
+            buff_addr,
+            4 * params.x_pixels * params.y_pixels,
+        ),
+        params.x_pixels,
+    );
+    
+    const ctx = CANVAS.getContext("2d");
+    jswmod.exports.redraw(
+        params.x_pixels,
+        params.y_pixels,
+        params.x,
+        params.y,
+        params.width
+    );
+    ctx.putImageData(img_data, 0, 0);
+    STATUS.hide();
+}
+
+async function init() {
+    STATUS.set("Loading...");
+    const { instance } = await WebAssembly.instantiateStreaming(
+        fetch("https://d2718.net/jset/jset_web.wasm")
+    );
+    jswmod = instance;
+    STATUS.hide();
+    render_image(DEFAULT_PARAMS);
+}
+
+function location_fracs(evt) {
+    const crect = CANVAS.getBoundingClientRect();
+    const xfrac = (evt.x - crect.left) / crect.width;
+    const yfrac = (evt.y - crect.top) / crect.height;
+    return { x: xfrac, y: yfrac };
+}
+
+function new_params(xfrac, yfrac, zoom_factor) {
+    const p = current_params;
+    
+    const height = p.width * p.y_pixels / p.x_pixels;
+    const xctr = p.x + (xfrac * p.width);
+    const yctr = p.y - (yfrac * height);
+    
+    const new_width = p.width / zoom_factor;
+    const new_height = height / zoom_factor;
+    const newx = xctr - (new_width / 2);
+    const newy = yctr + (new_height / 2);
+    
+    const np = {
+        x_pixels: p.x_pixels,
+        y_pixels: p.y_pixels,
+        x: newx,
+        y: newy,
+        width: new_width,
+    };
+    
+    return np;
+}
+
+CANVAS.onclick = function(evt) {
+    const coords = location_fracs(evt);
+    const new_p = new_params(coords.x, coords.y, 2.0);
+    current_params = new_p;
+    render_image(new_p);
+};
+
+document.getElementById("unzoom").onclick = function() {
+    const new_p = new_params(0.5, 0.5, 0.5);
+    current_params = new_p;
+    render_image(new_p);
+};
+
+init();
+    </script>
+</body>
+</html>
