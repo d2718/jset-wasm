@@ -396,4 +396,18 @@ COLOR.add.onclick = function(evt) {
     add_color_step(new_color, 256, "#000000");
 }
 
+// Help
+
+const HELP = {
+    div:    document.getElementById("help"),
+    open:   document.getElementById("help-open"),
+    close:  document.getElementById("help-close"),
+};
+HELP.open.onclick = function() {
+    HELP.div.style.display = "inline-block";
+}
+HELP.close.onclick = function() {
+    HELP.div.style.display = "none";
+}
+
 init();

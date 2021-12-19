@@ -7,6 +7,7 @@ body {
     z-index: 0;
 }
 div { box-sizing: border-box; }
+p { text-align: justify; }
 
 div#dbg {
     white-space: pre;
@@ -24,7 +25,10 @@ div#status {
     z-index: 5;
     display: none;
 }
-canvas { z-index: 1; }
+canvas {
+    z-index: 1;
+    cursor: crosshair;
+}
 div#canvas-outline {
     z-index: 2;
     position: fixed;
@@ -63,3 +67,23 @@ div#control > div {
 }
 div#control input[type="number"] { width: 12ex; }
 button.remove-gradient { font-family: monospace; }
+
+div#help {
+    position: fixed;
+    bottom: 1em; right: 1em;
+    z-index: 4;
+    display: none;
+    max-width: 60ex;
+}
+div#help-open {
+    position: fixed;
+    bottom: 1em; right: 1em;
+    z-index: 3;
+    cursor: help;
+}
+div#help-open div { font-family: monospace; }
+div#help-close {
+    text-align: right;
+    font-family: monospace;
+    cursor: default;
+}
