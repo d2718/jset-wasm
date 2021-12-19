@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Merriweather&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inconsolata&display=swap');
+
+body {
+    background-color: #222;
+    color: #cde;
+    z-index: 0;
+}
+div { box-sizing: border-box; }
+
+div#dbg {
+    white-space: pre;
+    font-family: monospace;
+}
+div.bordered {
+    background-color: #444;
+    border: 1em solid #666;
+    border-radius: 1em;
+    padding: 1em;
+}
+div#status {
+    position: fixed;
+    top: 1em; left: 1em;
+    z-index: 5;
+    display: none;
+}
+canvas { z-index: 1; }
+div#canvas-outline {
+    z-index: 2;
+    position: fixed;
+    background-color: none;
+    border: 1ex solid #cde;
+    box-sizing: border-box;
+    display: none;
+}
+
+div#control-open {
+    position: fixed;
+    top: 1em; right: 1em;
+    z-index: 3;
+    cursor: default;
+}
+div#control-open div { font-family: monospace; }
+div#control div#control-close {
+    justify-content: flex-end;
+    cursor: default;
+    font-family: monospace;
+}
+div#control {
+    position: fixed;
+    top: 1em; right: 1em;
+    z-index: 4;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1ex;
+}
+div#control > div {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1ex;
+}
+div#control input[type="number"] { width: 12ex; }
+button.remove-gradient { font-family: monospace; }

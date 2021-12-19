@@ -13,4 +13,4 @@ wasm-snip --snip-rust-fmt-code --snip-rust-panicking-code \
 
 wasm-strip $BINARY
 wasm-opt -o $OUTPUT -Oz $BINARY
-ls -lh $OUTPUT
+ls -l $OUTPUT
