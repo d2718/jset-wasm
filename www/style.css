@@ -37,6 +37,13 @@ div#canvas-outline {
     box-sizing: border-box;
     display: none;
 }
+button#m-zoom-in,
+button#m-zoom-out {
+    height: 3em;
+    width: 8em;
+    text-align: center;
+    font-family: monospace;
+}
 
 div#control-open {
     position: fixed;
@@ -86,4 +93,24 @@ div#help-close {
     text-align: right;
     font-family: monospace;
     cursor: default;
+}
+
+div#panic-background {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background-color: #222;
+    opacity: 0.8;
+    z-index: -1;
+    display: none;
+}
+div#panic-text {
+    position: fixed;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 1.0;
+    background-color: #411;
+    border: 1em solid #822;
+    border-radius: 1em;
+    padding: 1em;
 }

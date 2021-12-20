@@ -3,6 +3,11 @@
 
 const WASM_URI = "jset_web.wasm";
 
+/*
+`debug_chars` and `debug_char()` are to allow the wasm module to print debug
+information to the console in a way that doesn't involve passing explicit
+strings.
+*/
 let debug_chars = new Array();
 function debug_char(c) {
     if (c == 10) {
@@ -13,10 +18,21 @@ function debug_char(c) {
     }
 }
 
+/*
+`panique()` gets called by the wasm module if it panics. It _shouldn't_ panic,
+but just in case, let's have a clear error signal.
+*/
 function panique() {
     console.log("WASM module has panicked.");
+    const pdiv = document.getElementById("panic-background");
+    pdiv.style.zIndex = 10;
+    pdiv.style.display = "block";
 }
 
+/*
+Utility function for explicitly removing all all the DOM nodes beneath
+a given element. (To clear it, or in preparation for removing it.)
+*/
 function recursive_clear(elt) {
     while (elt.firstChild) {
         recursive_clear(elt.lastChild);
@@ -24,8 +40,23 @@ function recursive_clear(elt) {
     }
 }
 
+/*
+This variable will hold a reference to the wasm module after `init()`
+(see below) has been called.
+*/ 
 var jswmod = {};
+
+/*
+A reference to the main canvas, so we don't have to type
+`document.getElementById("demo-canvas")` all the time, and also because it's
+clearer and more concises when looking at the code.
+*/
 const CANVAS = document.getElementById("demo-canvas");
+
+/*
+Methods for showing/setting the contents of/hiding a status div, but they
+don't seem to work all the time, so IDK.
+*/
 const STATUS = {
     set: function(txt) {
         const div = document.getElementById("status");
@@ -48,6 +79,11 @@ const STATUS = {
     },
 };
 
+/*
+This is a debugging function to help determine if the contents of the
+image buffer in the wasm module have changed. It returns the last three
+digits of a checksum of the buffer contents.
+*/
 function checksum_buffer() {
     const arr = new Uint8ClampedArray(
         jswmod.exports.memory.buffer,
@@ -60,27 +96,48 @@ function checksum_buffer() {
     return csum % 1000;
 }
 
-function dbg(txt) {
-    let dd = document.getElementById("dbg");
-    dd.innerHTML = txt;
-}
-
+/*
+Default size/zoom parameters for drawing the image. The `render_image()`
+function (below) takes an object of this form as an argument.
+*/
 const DEFAULT_PARAMS = {
-    x_pixels: 1200,
-    y_pixels: 800,
-    x: -2.0,
-    y: 1.0,
-    width: 3.0
+    x_pixels: 1200,     // image width in pixels
+    y_pixels: 800,      // image height in pixels
+    x: -2.0,            // real coordinate of upper-left-hand corner
+    y: 1.0,             // imaginary coordinate of upper-left-hand corner
+    width: 3.0          // width of image on the Complex Plane
 };
+/*
+Zooming/panning and resising the image from the control panel stashes changes
+to the image parameters here. These are used by several functions, like
+`render_image()`, right below.
+*/
 let current_params = DEFAULT_PARAMS;
 
+/* Update the CANVAS with the current data in the wasm module's IMAGE buffer. */
+function update_canvas(xpix, ypix) {
+    CANVAS.width  = xpix;
+    CANVAS.height = ypix;
+    
+    const img_data = new ImageData(
+        new Uint8ClampedArray(
+            jswmod.exports.memory.buffer,
+            jswmod.exports.IMAGE.value,
+            4 * xpix * ypix
+        ),
+        xpix
+    );
+    CANVAS.getContext("2d").putImageData(img_data, 0, 0);
+}
+
+/*
+Ask the wasm module to re-iterate and recolor the image with the current
+image parameters. Takes an argument with the same structure as the
+`DEFAULT_PARAMS` constant, above.
+*/
 function render_image(params) {
     STATUS.set("Drawing...");
     //console.log(params);
-    
-    CANVAS.width = params.x_pixels;
-    CANVAS.height = params.y_pixels;
-    
     //console.log(` pre cksum: ${checksum_buffer()}`);
 
     jswmod.exports.redraw(
@@ -93,45 +150,25 @@ function render_image(params) {
     
     //console.log(`post cksum: ${checksum_buffer()}`);
     
-    const img_data = new ImageData(
-        new Uint8ClampedArray(
-            jswmod.exports.memory.buffer,
-            jswmod.exports.BUFFER.value,
-            4 * params.x_pixels * params.y_pixels,
-        ),
-        params.x_pixels,
-    );
-    
-    const ctx = CANVAS.getContext("2d");
-    ctx.putImageData(img_data, 0, 0);
+    update_canvas(params.x_pixels, params.y_pixels);
     STATUS.hide();
 }
 
-function recolor(color_params) {
+function recolor() {
     STATUS.set("Coloring...");
     const params = current_params;
     //console.log(params);
-    
     //console.log(` pre cksum: ${checksum_buffer()}`);
-    
-    COLOR.update_map(color_params);
-
+    COLOR.update_map();
     //console.log(`post cksum: ${checksum_buffer()}`);
-    
-    const img_data = new ImageData(
-        new Uint8ClampedArray(
-            jswmod.exports.memory.buffer,
-            jswmod.exports.BUFFER.value,
-            4 * params.x_pixels * params.y_pixels,
-        ),
-        params.x_pixels,
-    );
-    
-    const ctx = CANVAS.getContext("2d");
-    ctx.putImageData(img_data, 0, 0);
+    update_canvas(params.x_pixels, params.y_pixels);
     STATUS.hide();
 }
 
+/*
+Fetch the wasm module and generate an image with the default parameters.
+None of the other stuff on the page can really happen until this is called.
+*/
 async function init() {
     STATUS.set("Loading...");
     WebAssembly.instantiateStreaming(
@@ -145,7 +182,7 @@ async function init() {
         jswmod = obj.instance;
         jswmod.exports.update_color_map();
         STATUS.hide();
-        COLOR.update_map(COLOR.current_params);
+        COLOR.update_map();
         render_image(DEFAULT_PARAMS);
     }).catch(function(err) {
         STATUS.set("Error fetching WASM module; see console.");
@@ -153,6 +190,11 @@ async function init() {
     });
 }
 
+/*
+Called when the canvas is clicked, this function returns an object containing
+the pixel coordinates of the click and whether the shift or control keys
+were down.
+*/
 function click_details(evt) {
     const p = current_params;
     const crect = CANVAS.getBoundingClientRect();
@@ -171,6 +213,14 @@ function click_details(evt) {
     };
 }
 
+/*
+Given a `click` object (as returned by `click_details()`, above), this
+generates new size/zoom parameters (see `DEFAULT_PARAMS`, above) based on
+the location of the click and modifier keys.
+  * just a click: recenter the image there
+  * shift-click:  recenter and zoom in
+  * ctrl-click:   recenter and zoom out
+*/
 function new_params(click) {
     const p = current_params;
     const height = p.width * p.y_pixels / p.x_pixels;
@@ -201,7 +251,44 @@ CANVAS.onclick = function(evt) {
     render_image(new_p);
 };
 
-// Canvas Control
+/**
+Shift- and control- clicking on mobile is tough, so for now there is this
+hack of zoom in/out buttons that fire this function.
+*/
+function mobile_zoom(factor) {
+    const p = current_params;
+    const height = p.width * p.y_pixels / p.x_pixels;
+    let new_x, new_y;
+    if (factor > 1.0) {
+        new_x = p.x + p.width / (2 * factor);
+        new_y = p.y - height / (2 * factor);
+    } else {
+        new_x = p.x - p.width * factor;
+        new_y = p.y + height * factor;
+    }
+    
+    const new_params = {
+        x_pixels: p.x_pixels,
+        y_pixels: p.y_pixels,
+        x: new_x,
+        y: new_y,
+        width: p.width / factor,
+    };
+    
+    current_params = new_params;
+    render_image(new_params);
+}
+// And we add the function to the buttons.
+document.getElementById("m-zoom-in").onclick = function(evt) {
+    evt.preventDefault();
+    mobile_zoom(2.0);
+}
+document.getElementById("m-zoom-out").onclick = function(evt) {
+    evt.preventDefault();
+    mobile_zoom(0.5);
+}
+
+// Control panel elements and resizing functionality.
 
 const CONTROL = {
     div:     document.getElementById("control"),
@@ -210,10 +297,16 @@ const CONTROL = {
     width:   document.getElementById("ixpix"),
     height:  document.getElementById("iypix"),
     outline: document.getElementById("canvas-outline"),
+    /*  The size we've set the canvas to by adjusting the values of
+        `CONTROL.width` and `CONTROL.height`. */
     new_x:   DEFAULT_PARAMS.x_pixels,
     new_y:   DEFAULT_PARAMS.y_pixels,
 };
 
+/**
+Function to shows a guide outline over the current image when the image
+size controls' values are changed.
+*/
 function resize_canvas_box() {
     const crect = CANVAS.getBoundingClientRect();
     const outline = CONTROL.outline;
@@ -235,8 +328,12 @@ CONTROL.open.onclick = function(evt) {
 CONTROL.close.onclick = function(evt) {
     evt.preventDefault();
     CONTROL.div.style.display = "none";
+    // Ensure we hide the guide outline if it's showing.
     CONTROL.outline.style.display = "none";
-    recolor(COLOR.get_params());
+    // Automatically recolor the image, even if the color map hasn't changed,
+    // because this is cheap.
+    recolor();
+    // If the size of the image has changed, rerender the image.
     if ((CONTROL.new_x != current_params.x_pixels)
         || (CONTROL.new_y != current_params.y_pixels))
     {
@@ -308,7 +405,9 @@ COLOR.get_params = function() {
     return new_params;
 }
 
-COLOR.update_map = function(p) {
+COLOR.update_map = function() {
+    const p = COLOR.get_params();
+    
     if (p.n_steps > COLOR.MAX_STEPS) {
         console.log("Too many steps in color map.");
         return null;
@@ -320,19 +419,19 @@ COLOR.update_map = function(p) {
     }
     
     for (let n = 0; n < p.n_steps; n++) {
-        jswmod.exports.set_color_step(n,
+        jswmod.exports.set_gradient(n,
             p.r_starts[n], p.g_starts[n], p.b_starts[n],
             p.r_ends[n], p.g_ends[n], p.b_ends[n],
             p.shades[n]
         );
     }
-    jswmod.exports.set_n_steps(p.n_steps);
+    jswmod.exports.set_n_gradients(p.n_steps);
     jswmod.exports.update_color_map();
     const iparms = current_params;
     jswmod.exports.recolor(iparms.x_pixels, iparms.y_pixels);
 }
 
-function add_color_step(start, steps, end) {
+function add_gradient(start, steps, end) {
     const tr = document.createElement("tr");
     
     const std = document.createElement("td");
@@ -381,7 +480,7 @@ function add_color_step(start, steps, end) {
 
 // Set initial color parameter defaults.
 for (const tup of COLOR.defaults) {
-    add_color_step(tup[0], tup[1], tup[2]);
+    add_gradient(tup[0], tup[1], tup[2]);
 }
 COLOR.current_params = COLOR.get_params();
 console.log(COLOR.current_params);
@@ -393,7 +492,7 @@ COLOR.add.onclick = function(evt) {
     if(tos.length > 0) {
         new_color = tos[tos.length-1].value;
     }
-    add_color_step(new_color, 256, "#000000");
+    add_gradient(new_color, 256, "#000000");
 }
 
 // Help

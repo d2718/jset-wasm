@@ -1,50 +1,150 @@
-//! lib.rs
+/*!
+WASM module for coloring Julia sets based on divergence speed.
+
+All arrays are of static size to avoid allocation. Current limitations are:
+  * image size 1920 x 1080 pixels
+  * 16 gradients
+  * 65,535 individual color steps
+
+All functions are only ever called single-threadedly from Javascript, so
+anything marked `unsafe` actually isn't. I've still tried to minimize the
+amount of actual code in `unsafe` blocks, though.
+
+To render an image in an HTML `<canvas>` using this module:
+  * Load this wasm module into your JS script. If you want this module to
+    signal when it panics, bind your function to indicate panic to the
+    `pnk()` function. Do this with, for example, the following environment
+    object as the second argument to `WebAssembly.instantiateStreaming()`:
+    ```javascript
+    {
+        "env": {
+            "pnk": your_panic_function,
+        },
+    }
+    ```
+  * Call `set_gradient(n, r0, b0, g0, r1, g1, b1, n_steps)` for each gradient
+    in your color map.
+  * Call `set_n_gradients(n)` to the number of gradients in your color map.
+  * Call `update_color_map()` to process those gradients into an array of
+    individual colors used in the next step.
+  * Call `redraw(xpix, ypix, x, y, width)` to write image data to the exposed
+    `IMAGE` buffer.
+  * Finally, wrap the `IMAGE` buffer in a `Uint8ClampedArray`, and use the
+    `<canvas>` context's `.putImageData()` method to insert the image into
+    the canvas.
+*/
 
 #![no_std]
 
+/// This function is exposed by the JS; it is intended to signal a panic.
 extern { fn pnk(); }
 
+/// Just signals a panic and then goes busy-wait catatonic.
 #[panic_handler]
 fn handle_panic(_: &core::panic::PanicInfo) -> ! {
     unsafe { pnk(); }
     loop {};
 }
 
+/// largest allowable image width
 const MAX_WIDTH: usize  = 1920;
+/// largest allowable image height
 const MAX_HEIGHT: usize = 1080;
-const BUFFER_SIZE: usize = MAX_WIDTH * MAX_HEIGHT;
-const COLOR_BUFF_SIZE: usize = 65_536;
-const MAX_COLOR_STEPS: usize = 16;
+/// image data buffer size calculated from `MAX_WIDTH` and `MAX_HEIGHT`
+const IMAGE_SIZE: usize = MAX_WIDTH * MAX_HEIGHT;
+/// maximum number gradients in the color map
+const MAX_GRADIENTS: usize = 16;
+/// maximum number of individual color steps in the color map
+const COLOR_MAP_LENGTH: usize = 65_536;
+/// maximum number of polynomial coefficients (unused!)
+const MAX_COEFFS: usize = 7;
 
+/**
+The actual data that gets passed to the HTML canvas in a Javascript
+`Uint8ClampedArray`. Format of each u32 is `0xAABBGGRR`.
+*/
 #[no_mangle]
-static mut BUFFER:  [u32; BUFFER_SIZE] = [0; BUFFER_SIZE];
-static mut ITERMAP: [u16; BUFFER_SIZE] = [0; BUFFER_SIZE];
-static mut COLRMAP: [u32; COLOR_BUFF_SIZE] = [0; COLOR_BUFF_SIZE];
+static mut IMAGE:   [u32; IMAGE_SIZE] = [0; IMAGE_SIZE];
+/**
+Output of the "iterator" stage; value is the number of steps it takes any
+given pixel's point do diverge.
+*/
+static mut ITERMAP: [u16; IMAGE_SIZE] = [0; IMAGE_SIZE];
+/**
+The collection of actual color values. `COLOR_MAP[n]` is the color a pixel
+will be colored when its point takes `n` iterations to exceed the modulus
+limit.
+*/
+static mut COLOR_MAP: [u32; COLOR_MAP_LENGTH] = [0; COLOR_MAP_LENGTH];
 
-// Color map values.
-static mut R0: [u8; MAX_COLOR_STEPS] = [  0,   0,   0,   0, 255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-static mut R1: [u8; MAX_COLOR_STEPS] = [  0,   0,   0, 255, 255, 255,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-static mut G0: [u8; MAX_COLOR_STEPS] = [  0,   0, 255, 255, 255,   0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-static mut G1: [u8; MAX_COLOR_STEPS] = [  0, 255, 255, 255,   0,   0,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-static mut B0: [u8; MAX_COLOR_STEPS] = [  0, 255, 255,   0,   0,   0, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-static mut B1: [u8; MAX_COLOR_STEPS] = [255, 255,   0,   0,   0, 255,   0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-static mut SHADES: [u16; MAX_COLOR_STEPS] = [ 256, 256, 256, 256, 256, 256, 256, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-static mut N_STEPS: usize = 7;
+/**
+The color gradients.
+
+The first gradient goes from `(R0[0], G0[0], B0[0])` to `(R1[0], B1[0], G1[0])`
+in `SHADES[0]` steps. The second goes from `(R0[1], G0[1], B0[1])` to
+`(R1[1], G1[1], B1[1])` in `SHADES[`]` steps, etc.
+*/
+static mut R0:      [u8; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
+static mut R1:      [u8; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
+static mut G0:      [u8; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
+static mut G1:      [u8; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
+static mut B0:      [u8; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
+static mut B1:      [u8; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
+static mut SHADES: [u16; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
+/// The number of gradients in the current color scheme.
+static mut N_GRADIENTS: usize = 7;
+/// The color to color points that iterate past the end of the gradient.
 static DEFAULT_COLOR: u32 = 0xFF_00_00_00;
+/**
+The number of shades in the _last used_ colormap. This is currently unused,
+but will be useful when coloration without reiteration is refined.
+*/
+static mut LAST_COLORMAP_LENGTH: usize = 0;
+/**
+The number of shades in the last _calculated_ color map. This should be the
+number used by the _currently running_ coloring routine.
+*/
+static mut CURRENT_COLORMAP_LENGTH: usize = 0;
 
+/**
+The default iteration limit. Points are colored based on how many iterations
+it takes for their squared moduli to exceed this limit.
+*/
+static SQ_MOD_LIMIT: f64 = 1_000_000.0;
+
+/// The following three values will be unused until the polynomial iterator
+/// is brought online.
+
+/**
+Coefficients for the polynomial iterator. Constant term is
+`RE[0] + iIM[0]`; the sextic term is `RE[6] + iIM[6]`.
+*/
+static mut RE: [f64; 7] = [1.0, 0.707, 0.0, 0.0, 0.0, 0.0, 0.0];
+static mut IM: [f64; 7] = [0.0, 0.707, 0.0, 0.0, 0.0, 0.0, 0.0];
+/// Number of coefficients currently in use by the polynomial iterator.
+static mut N_COEFFS: u8 = 7;
+
+/**
+Populate the `COLOR_MAP` based on color gradient data.
+
+The first eight arguments are immutable references to the color gradient
+data (above). `colors` is a, `&mut` to the `COLOR_MAP`, and `map_length` is
+an `&mut` to `CURRENT_COLORMAP_LENGTH`, which it sets.
+*/
 fn make_color_map(
-    r_starts: &[u8; MAX_COLOR_STEPS],
-    r_ends:   &[u8; MAX_COLOR_STEPS],
-    g_starts: &[u8; MAX_COLOR_STEPS],
-    g_ends:   &[u8; MAX_COLOR_STEPS],
-    b_starts: &[u8; MAX_COLOR_STEPS],
-    b_ends:   &[u8; MAX_COLOR_STEPS],
-    shade_counts: &[u16; MAX_COLOR_STEPS],
-    total_steps: usize,
-    colors: &mut [u32; COLOR_BUFF_SIZE]
+    r_starts: &[u8; MAX_GRADIENTS],
+    r_ends:   &[u8; MAX_GRADIENTS],
+    g_starts: &[u8; MAX_GRADIENTS],
+    g_ends:   &[u8; MAX_GRADIENTS],
+    b_starts: &[u8; MAX_GRADIENTS],
+    b_ends:   &[u8; MAX_GRADIENTS],
+    shade_counts: &[u16; MAX_GRADIENTS],
+    n_gradients: usize,
+    colors: &mut [u32; COLOR_MAP_LENGTH],
+    map_length: &mut usize
 ) {
     let mut color_idx: usize = 0;
-    for step_n in 0..total_steps {
+    for step_n in 0..n_gradients {
         let (r0, r1) = (r_starts[step_n] as f32, r_ends[step_n] as f32);
         let (g0, g1) = (g_starts[step_n] as f32, g_ends[step_n] as f32);
         let (b0, b1) = (b_starts[step_n] as f32, b_ends[step_n] as f32);
@@ -64,21 +164,32 @@ fn make_color_map(
         }
     }
     
-    // fill the rest of the buffer with zeros
-    // the first zero falue will be used as a zigamorph later on
-    for n in color_idx..COLOR_BUFF_SIZE {
+    // Set `CURRENT_COLORMAP_LENGTH`.
+    *map_length = color_idx;
+    
+    // Fill the rest of the buffer with zeros. Originally the first zero
+    // value was used as a zigamorph for determining the length of the
+    // color map, but now that value is explicitly stored. I think it's
+    // still a good idea to zero the whole thing, though, and it's fast.
+    for n in color_idx..COLOR_MAP_LENGTH {
         colors[n] = 0u32;
     }
 }
 
+/**
+Exported function to set the values for gradient `n`. Takes `n` followed
+by the RGB values (in that order) of the beginning color, then the end
+color, then finally the number of shades it should take to fade between
+the two.
+*/
 #[no_mangle]
-pub unsafe extern fn set_color_step(
+pub unsafe extern fn set_gradient(
     n: usize,
     r0: u8, g0: u8, b0: u8,
     r1: u8, g1: u8, b1: u8,
     shades: u16
 ) {
-    if n < MAX_COLOR_STEPS {
+    if n < MAX_GRADIENTS {
         R0[n] = r0; R1[n] = r1;
         G0[n] = g0; G1[n] = g1;
         B0[n] = b0; B1[n] = b1;
@@ -86,22 +197,66 @@ pub unsafe extern fn set_color_step(
     }
 }
 
+/**
+Exported function to set the number of gradients in the current color map.
+Without this value, `make_color_map()` has no idea how many of the gradient
+steps to use.
+*/
 #[no_mangle]
-pub unsafe fn set_n_steps(n: usize) { 
-    if n < MAX_COLOR_STEPS { N_STEPS = n; }
+pub unsafe fn set_n_gradients(n: usize) { 
+    if n < MAX_GRADIENTS { N_GRADIENTS = n; }
 }
 
+/**
+Exported function to recalculate/repopulate the `COLOR_MAP`, presumably
+after calling `set_gradient()` and `set_n_gradients()`.
+*/
 #[no_mangle]
 pub unsafe extern fn update_color_map() {
     // This is only ever called from JS, so `&mut COLRMAP` will only ever
     // exist here when this function is running.
     make_color_map(
         &R0, &R1, &G0, &G1, &B0, &B1,
-        &SHADES, N_STEPS as usize,
-        &mut COLRMAP
+        &SHADES, N_GRADIENTS,
+        &mut COLOR_MAP, &mut CURRENT_COLORMAP_LENGTH
     );
 }
 
+/**
+Walk the iteration data in `ITERMAP` and use the color data in `COLOR_MAP`
+to write the actual image data to the `IMAGE` buffer.
+
+The first two arguements are immutable references to `ITERMAP` and
+`COLOR_MAP`, `outbuff` is an `&mut` to `IMAGE`, `default_color` should be
+self-explanatory, `npix` is the total number of pixels in the image
+(that is, the length of the meaningful data in `ITERMAP`), and `n_shades`
+is the value of `CURRENT_COLORMAP_LENGTH` (that is, the length of the
+meaningful data in `COLOR_MAP`).
+*/
+fn color_itermap(
+    itrmap: &[u16; IMAGE_SIZE],
+    colormap: &[u32; COLOR_MAP_LENGTH],
+    outbuff: &mut [u32; IMAGE_SIZE],
+    default_color: u32,
+    npix: usize,
+    n_shades: usize,
+) {
+    for n in 0..npix {
+        let col_idx = itrmap[n] as usize;
+        if col_idx < n_shades {
+            outbuff[n] = colormap[col_idx];
+        } else {
+            outbuff[n] = default_color;
+        }
+    }
+}
+
+/**
+Return how many iterations of z = z^2 + c the point `x` + i`y` takes before its
+squared modulus exceeds `sq_mod_limit` (or `iter_limit`, if it doesn't
+exceed it by `iter_limit` iterations). `iter_limit` should be the length
+of the valid data in `COLOR_MAP`.
+*/
 fn mandelbrot_iter(
     x: f64, y: f64,
     sq_mod_limit: f64, iter_limit: u16
@@ -120,55 +275,23 @@ fn mandelbrot_iter(
     return iter_limit;
 }
 
-fn color_itermap(
-    itrmap: &[u16; BUFFER_SIZE],
-    colormap: &[u32; COLOR_BUFF_SIZE],
-    outbuff: &mut [u32; BUFFER_SIZE],
-    default_color: u32,
-    npix: usize,
-) {
-    let mut n_shades: usize = 0;
-    
-    // limit number of iterations
-    for n in 0..COLOR_BUFF_SIZE {
-        if colormap[n] == 0u32 {
-            n_shades = n; break;
-        }
-    }
-    
-    for n in 0..npix {
-        let col_idx = itrmap[n] as usize;
-        if col_idx < n_shades {
-            outbuff[n] = colormap[col_idx];
-        } else {
-            outbuff[n] = default_color;
-        }
-    }
-}
+/**
+Given the pixel dimensions of the image (`xpix`, `ypix`), the coordinates of
+the upper-left-hand corner of the image (`x`, `y`), and the width of the
+image on the Complex Plane (`width`), fill the appropriate amount of
+`ITERMAP` (passed as `&mut buff`) with iteration data.
 
-#[no_mangle]
-pub unsafe extern fn recolor(xpix: usize, ypix: usize) {
-    color_itermap(&ITERMAP, &COLRMAP, &mut BUFFER, DEFAULT_COLOR, xpix*ypix);
-}
-
-#[no_mangle]
-pub unsafe extern fn redraw(
-    xpix: usize, ypix: usize,
-    x: f64, y: f64,
-    width: f64
-) {
-    // This function is _only_ ever called from Javascript, which is
-    // single-threaded, so the following `mut` references will always
-    // be unique.
-    iterate(xpix, ypix, x, y, width, &mut ITERMAP);
-    recolor(xpix, ypix);
-}
-
-fn iterate(
+`map_length` is the length of the data in `COLOR_MAP` (that is, the value
+of `CURRENT_COLORMAP_LENGTH`); `last_map_length` is an `&mut` to
+`LAST_COLORMAP_LENGTH`, which it sets when it's done.
+*/
+fn calc_mbrot_itermap(
     xpix: usize, ypix: usize,
     x: f64, y: f64,
     width: f64,
-    buff: &mut [u16; BUFFER_SIZE]
+    buff: &mut [u16; IMAGE_SIZE],
+    map_length: usize,
+    last_map_length: &mut usize
 ) {
     // Limit our image size so that we can fit within our static buffer.
     let xpix = if xpix > MAX_WIDTH  { MAX_WIDTH }  else { xpix };
@@ -178,16 +301,57 @@ fn iterate(
     let ypixf = ypix as f64;
     let height = width * ypixf / xpixf;
     
+    // This is fine because no one else is futzing with COLRMAP right now.
+    let n_shades = map_length as u16;
+    
     for yp in 0..ypix {
         let y_val = y - height * ((yp as f64) / ypixf);
         let idx_base: usize = yp * xpix;
         for xp in 0..xpix {
             let x_val = x + width * ((xp as f64) / xpixf);
             let idx = idx_base + xp;
-            let n = mandelbrot_iter(x_val, y_val, 4.0f64, 1792u16);
+            let n = mandelbrot_iter(x_val, y_val, SQ_MOD_LIMIT, n_shades);
             buff[idx] = n;
         }
     }
+    
+    *last_map_length = map_length;
+}
+
+/**
+Exported function to rewrite the `IMAGE` data after having changed the
+color gradients via calls to  `set_gradient()` and `set_n_gradients()`.
+*/
+#[no_mangle]
+pub unsafe extern fn recolor(xpix: usize, ypix: usize) {
+    color_itermap(
+        &ITERMAP, &COLOR_MAP, &mut IMAGE,
+        DEFAULT_COLOR, xpix*ypix, CURRENT_COLORMAP_LENGTH
+    );
+}
+
+/**
+Exported function to rewrite the iteration map after changing the view
+on the plane or the size of the image. Also calls `color_itermap()` to
+rewrite the `IMAGE` data.
+  * `xpix` and `ypix`: image dimensions in pixels.
+  * `x` and `y`: coordinates of the upper-left-hand corner of the image
+  * `width`: the width of the image on the Complex Plaine
+*/
+#[no_mangle]
+pub unsafe extern fn redraw(
+    xpix: usize, ypix: usize,
+    x: f64, y: f64,
+    width: f64
+) {
+    calc_mbrot_itermap(
+        xpix, ypix, x, y, width,
+        &mut ITERMAP, CURRENT_COLORMAP_LENGTH, &mut LAST_COLORMAP_LENGTH
+    );
+    color_itermap(
+        &ITERMAP, &COLOR_MAP, &mut IMAGE,
+        DEFAULT_COLOR, xpix*ypix, CURRENT_COLORMAP_LENGTH
+    );
 }
 
 //~ extern { fn dbg(c: char); }

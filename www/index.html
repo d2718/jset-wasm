@@ -12,6 +12,13 @@
     <div id="status" class="bordered"></div>
     <canvas id="demo-canvas"></canvas><br>
     <div id="canvas-outline"></div>
+    Mobile zoom controls:
+    <button type="button" id="m-zoom-in">
+        <label for="m-zoom-in">[ + in ]</label>
+    </button>
+    <button type="button" id="m-zoom-out">
+        <label for="m-zoom-out">[ - out ]</label>
+    </button>
     
     <div id="control" class="bordered">
         <div id="control-close">
@@ -42,6 +49,7 @@
                 <label for="add-color">+ color</label>
             </button>
         </div>
+        
     </div>
     <div id="control-open" class="bordered"
          title="open settings window">
@@ -56,6 +64,11 @@
         
         <p>Zoom out by ctrl-clicking.</p>
         
+        <p>(You can also obviously use the mobile
+        <code>[&nbsp;+&nbsp;in&nbsp;]</code> and
+        <code>[&nbsp;-&nbsp;out&nbsp;]</code> buttons to zoom around the
+        center of the image.)</p>
+        
         <p>Click on the <code>[+]</code> in the upper-right-hand corner
         to adjust the image size and color map.</p>
         
@@ -66,6 +79,11 @@
          <div>[?]</div>
     </div>
     
-    <div id="dbg"></div>
+    <div id="panic-background">
+        <div id="panic-text">
+            The high-performance arithmetic module had a panic attack.
+            Please reload the page.
+        </div>
+    </div>
 </body>
 </html>
