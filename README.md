@@ -45,6 +45,29 @@ wasm_mod.instance.exports.set_n_gradients(4); // We set gradients 0-3 above.
 wasm_mod.instance.exports.update_color_map();
 ```
 
+  * If you want to use the polynomial iterator, specify the polynomial
+    function to use with `set_coeff()` to set each coefficient and
+    to tell the module how many coefficients you want to use `set_n_coeffs()`.
+```javascript
+    // Specify iterator as f(z) = z^2 + 0.7e^(i0.63π)
+
+    // Calculate the real and imaginary parts of the constant term from
+    // its polar coordinates:
+    const re_part = 0.7 * Math.cos(0.63 * Math.PI);
+    const im_part = 0.7 * Math.sin(0.63 * Math.PI);
+
+    wasm_mod.instance.exports.set_coeff(0, re_part, im_part);
+    wasm_mod.instance.exports.set_coeff(1, 0, 0);
+    wasm_mod.instance.exports.set_coeff(2, 1.0, 0);
+    wasm_mod.instance.exports.set_n_coeffs(3);
+```
+    Be careful with the polynomial iterator. While the Mandlebrot iterator is
+    guaranteed to produce an interesting image, most sets of polynomial
+    coefficients will not. The one specified in the example above will, so if
+    you want quick results, start with that, and make _small_ incremental
+    changes until you have something you like. Keep your coefficients small,
+    especially the higher-degree ones.
+
   * Call `redraw()` with the appropriate image parameters to churn through
     all the calculations and write image data to the exposed `IMAGE` buffer.
 ```javascript
@@ -53,7 +76,8 @@ wasm_mod.instance.exports.update_color_map();
         ypix,   // height of canvas in pixels
         x,      // real coordinate of upper-left-hand corner of image
         y,      // imaginary coordinate of upper-left-hand corner of image
-        width   // width of image on the Complex plane
+        width,  // width of image on the Complex plane
+        poly_p  // boolean indicating whenther to use the polynomial iterator
     );
 ```
 
@@ -106,10 +130,13 @@ call fast.
 
 ## Plans
 
-Right now this is still pretty primitive. It only does the Mandlebrot iterator
-with a fixed coloring. Eventually I'd like to have
+All the core functionality is now implemented. 
 
-  * user-specifiable polynomial iteration (in the works)
+  * ~~user-specifiable polynomial iteration~~ done!
   * ~~user-specifiable color map~~ done!
-  * drag-resiable canvas
   * perhaps some type of smoothing, blurring, or downsampling
+  * improved UI of the web interface
+    + drag-resizable canvas
+    + better ergonomics/visuals for entering polynomial coefficients
+    + fixed-size controls `<div>`
+    + sucking less on mobile

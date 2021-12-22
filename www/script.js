@@ -101,8 +101,8 @@ Default size/zoom parameters for drawing the image. The `render_image()`
 function (below) takes an object of this form as an argument.
 */
 const DEFAULT_PARAMS = {
-    x_pixels: 600,     // image width in pixels
-    y_pixels: 400,      // image height in pixels
+    x_pixels: 1200,     // image width in pixels
+    y_pixels: 800,      // image height in pixels
     x: -2.0,            // real coordinate of upper-left-hand corner
     y: 1.0,             // imaginary coordinate of upper-left-hand corner
     width: 3.0,         // width of image on the Complex Plane

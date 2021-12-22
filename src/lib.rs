@@ -7,8 +7,8 @@ All arrays are of static size to avoid allocation. Current limitations are:
   * 65,535 individual color steps
 
 All functions are only ever called single-threadedly from Javascript, so
-anything marked `unsafe` actually isn't. I've still tried to minimize the
-amount of actual code in `unsafe` blocks, though.
+anything marked `unsafe` actually isn't. This is basically C. I've still
+tried to minimize the amount of actual code in `unsafe` blocks, though.
 
 To render an image in an HTML `<canvas>` using this module:
   * Load this wasm module into your JS script. If you want this module to
@@ -24,11 +24,16 @@ To render an image in an HTML `<canvas>` using this module:
     ```
   * Call `set_gradient(n, r0, b0, g0, r1, g1, b1, n_steps)` for each gradient
     in your color map.
-  * Call `set_n_gradients(n)` to the number of gradients in your color map.
+  * Call `set_n_gradients(n)` to let the module know the number of
+    gradients in your color map.
   * Call `update_color_map()` to process those gradients into an array of
     individual colors used in the next step.
-  * Call `redraw(xpix, ypix, x, y, width)` to write image data to the exposed
-    `IMAGE` buffer.
+  * If you are using the polynomial iterator, call `set_coeff(n, re, im)`
+    for each complex coefficient in your polynomial, then call
+    `set_n_coeffs(n)` to let the module know how many coefficients your
+    polynomial has.
+  * Call `redraw(xpix, ypix, x, y, width, use_poly_iter)` to write image
+    data to the exposed `IMAGE` buffer.
   * Finally, wrap the `IMAGE` buffer in a `Uint8ClampedArray`, and use the
     `<canvas>` context's `.putImageData()` method to insert the image into
     the canvas.
@@ -139,21 +144,21 @@ impl Cx {
 }
 
 /**
-Coefficients for the polynomial iterator. Constant term is
-`RE[0] + iIM[0]`; the sextic term is `RE[6] + iIM[6]`.
+Coefficients for the polynomial iterator. `COEFFS[0]` is the constant term;
+`COEFFS[6]` is the sextic term. If you need more terms, just change the
+value of `MAX_COEFFS` above.
 */
-//~ static mut RE: [f64; MAX_COEFFS] = [0.0; MAX_COEFFS];
-//~ static mut IM: [f64; MAX_COEFFS] = [0.0; MAX_COEFFS];
-//~ /// Number of coefficients currently in use by the polynomial iterator.
-static mut N_COEFFS: usize = 1;
 static mut COEFFS: [Cx; MAX_COEFFS] = [Cx { re: 0.0, im: 0.0 }; MAX_COEFFS ];
+
+/// Number of coefficients currently in use by the polynomial iterator.
+static mut N_COEFFS: usize = 1;
 
 /**
 Populate the `COLOR_MAP` based on color gradient data.
 
 The first eight arguments are immutable references to the color gradient
-data (above). `colors` is a, `&mut` to the `COLOR_MAP`, and `map_length` is
-an `&mut` to `CURRENT_COLORMAP_LENGTH`, which it sets.
+data (above). `colors` is a `&mut` to the `COLOR_MAP`, and `map_length` is
+an `&mut` to `CURRENT_COLORMAP_LENGTH`, which gets set at the end..
 */
 fn make_color_map(
     r_starts: &[u8; MAX_GRADIENTS],
@@ -181,6 +186,7 @@ fn make_color_map(
             let r = r0 + (frac * dr);
             let g = g0 + (frac * dg);
             let b = b0 + (frac * db);
+            // Each pixel's layout is `0xAA_BB_GG_RR`
             let col: u32 = (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
                                       | 0xFF_00_00_00u32;
             colors[color_idx] = col;
@@ -281,12 +287,6 @@ Exported function to set coefficients for the polynomial iterator.
 #[no_mangle]
 pub unsafe extern fn set_coeff(n: usize, re: f64, im: f64) {
     if n < MAX_COEFFS {
-        //~ dbg_msg("setting coeff "); dbg_num(n);
-        //~ dbg_msg(": (");
-        //~ dbg_float(re); dbg_msg(", "); dbg_float(im);
-        //~ dbg_msg(")\n");
-        
-        //RE[n] = re; IM[n] = im;
         COEFFS[n] = Cx{ re, im };
     }
 }
@@ -297,7 +297,6 @@ iterator to use.
 */
 #[no_mangle]
 pub unsafe extern fn set_n_coeffs(n: usize) {
-    //~ dbg_msg("n_coeffs: "); dbg_num(n); dbg_msg("\n");
     if n < MAX_COEFFS { N_COEFFS = n; }
 }
 
@@ -311,19 +310,6 @@ fn mandelbrot_iter(
     x: f64, y: f64,
     sq_mod_limit: f64, iter_limit: u16
 ) -> u16 {
-    
-    //~ let mut cur_x: f64 = 0.0;
-    //~ let mut cur_y: f64 = 0.0;
-    
-    //~ for n in 0..iter_limit {
-        //~ let xsq = cur_x * cur_x;
-        //~ let ysq = cur_y * cur_y;
-        //~ if xsq + ysq > sq_mod_limit { return n; }
-        //~ cur_y = (2.0f64 * cur_x * cur_y) + y;
-        //~ cur_x = (xsq - ysq) + x;
-    //~ }
-    //~ return iter_limit;
-    
     let c = Cx { re: x, im: y };
     let mut cur = Cx { re: 0.0, im: 0.0 };
     
@@ -360,7 +346,6 @@ fn calc_mbrot_itermap(
     let ypixf = ypix as f64;
     let height = width * ypixf / xpixf;
     
-    // This is fine because no one else is futzing with COLRMAP right now.
     let n_shades = map_length as u16;
     
     for yp in 0..ypix {
@@ -377,6 +362,15 @@ fn calc_mbrot_itermap(
     *last_map_length = map_length;
 }
 
+/**
+Like `mandlebrot_iter()`, above, it determines how many iterations of the
+polynomial iterator (whose coefficients are given by `coeffs`) it takes for
+the given point's squared modulus to exceed `sq_mod_limit`.
+
+The extra two arguments in there are a reference to `COEFFS` (`coeffs`) and
+the degree of the polynomial (`degree`, which is one less than the number
+of coefficients to use).
+*/
 fn polynomial_iter(
     x: f64, y: f64,
     coeffs: &[Cx; MAX_COEFFS],
@@ -401,6 +395,13 @@ fn polynomial_iter(
     return iter_limit
 }
 
+/**
+Like `calc_mbrot_itermap()`, above, but uses the polynomial iterator. The
+two extra arguments at the end specify the polynomial:
+
+  * `coeffs` should be a references to `COEFFS`
+  * `n_coeffs` should be the values of `N_COEFFS`
+*/
 fn calc_poly_itermap(
     xpix: usize, ypix: usize,
     x: f64, y: f64,
@@ -416,7 +417,7 @@ fn calc_poly_itermap(
     let ypix = if ypix > MAX_HEIGHT { MAX_HEIGHT } else { ypix };
     
     // Limit number of polynomial terms to sane amount.
-    let degree = if n_coeffs < 1 { return; }    // Don't do anything; this is stupid.
+    let degree = if n_coeffs < 1 { return; }    // Stop; this is stupid.
             else if n_coeffs > MAX_COEFFS { MAX_COEFFS-1 }
             else { n_coeffs-1 };
     
@@ -464,6 +465,9 @@ rewrite the `IMAGE` data.
   * `xpix` and `ypix`: image dimensions in pixels.
   * `x` and `y`: coordinates of the upper-left-hand corner of the image
   * `width`: the width of the image on the Complex Plaine
+  * `use_polynomial_iterator`: if this is `false`, the Mandlebrot iterator
+    will be used to create the iteration map; if `true`, the polynomial
+    iterator will be used
 */
 #[no_mangle]
 pub unsafe extern fn redraw(
