@@ -61,12 +61,13 @@ wasm_mod.instance.exports.update_color_map();
     wasm_mod.instance.exports.set_coeff(2, 1.0, 0);
     wasm_mod.instance.exports.set_n_coeffs(3);
 ```
-    Be careful with the polynomial iterator. While the Mandlebrot iterator is
-    guaranteed to produce an interesting image, most sets of polynomial
-    coefficients will not. The one specified in the example above will, so if
-    you want quick results, start with that, and make _small_ incremental
-    changes until you have something you like. Keep your coefficients small,
-    especially the higher-degree ones.
+
+Be careful with the polynomial iterator. While the Mandlebrot iterator is
+guaranteed to produce an interesting image, most sets of polynomial
+coefficients will not. The one specified in the example above will, so if
+you want quick results, start with that, and make _small_ incremental
+changes until you have something you like. Keep your coefficients small,
+especially the higher-degree ones.
 
   * Call `redraw()` with the appropriate image parameters to churn through
     all the calculations and write image data to the exposed `IMAGE` buffer.
