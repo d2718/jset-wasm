@@ -24,6 +24,7 @@
         <div id="control-close">
             <div title="close this window and apply changes">[-]</div>
         </div>
+        <div><h3>View</h3></div>
         <div>
             <label for="ixpix">Width:</label>
             <input type="number" id="ixpix"
@@ -34,6 +35,17 @@
             <input type="number" id="iypix"
                    min="64" max="1080" value="300">
         </div>
+        <div>
+            <label for="izbar">Zoom:</label>
+            <input type="range" id="izbar" min="1.0" max="10.0"
+                   step="0.1", value="2.0">
+        </div>
+        <div>
+            <input type="number" id="iznum" min="1.0" max="10.0"
+                   step="0.1" value="2.0">
+        </div>
+        
+        <div><h3>Color</h3></div>
         <div id="color-map">
             <table>
                 <thead><tr>
@@ -50,6 +62,66 @@
             </button>
         </div>
         
+        <div><h3>Iteration</h3></div>
+        
+        <div id="iterator-choice">
+            <div>Iterator:</div>
+            <div><form id="iter-type">
+                <label>
+                <input type="radio" id="iter-mbrot" value="mandlebrot"
+                       name="iter-pick" checked>&nbsp;Mandlebrot
+                </label>
+                <br>
+                <label>
+                Polynomial&nbsp;<input type="radio" id="iter-poly"
+                                       name="iter-pick" value="polynomial">
+                </label>
+            </form></div>
+        </div>
+        
+        <div id="polynomial"><form id="poly-params">
+            <table>
+                <thead><tr>
+                    <th><var>c</var></th>
+                    <th><var>z</var></th>
+                    <th><var>z<sup>2</sup></var></th>
+                    <th><var>z<sup>3</sup></var></th>
+                    <th><var>z<sup>4</sup></var></th>
+                    <th><var>z<sup>5</sup></var></th>
+                    <th><var>z<sup>6</sup></var></th>
+                </tr></thead>
+                <tbody>
+                    <tr>
+                        <td>r&nbsp;<input class="r" value="0.7"></td>
+                        <td>r&nbsp;<input class="r" value="0.0"></td>
+                        <td>r&nbsp;<input class="r" value="1.0"></td>
+                        <td>r&nbsp;<input class="r"></td>
+                        <td>r&nbsp;<input class="r"></td>
+                        <td>r&nbsp;<input class="r"></td>
+                        <td>r&nbsp;<input class="r"></td>
+                    </tr>
+                    <tr>
+                        <td>&theta;&nbsp;<input class="t" value="0.63">&nbsp;&pi;</td>
+                        <td>&theta;&nbsp;<input class="t" value="0.0">&nbsp;&pi;</td>
+                        <td>&theta;&nbsp;<input class="t" value="0.0">&nbsp;&pi;</td>
+                        <td>&theta;&nbsp;<input class="t">&nbsp;&pi;</td>
+                        <td>&theta;&nbsp;<input class="t">&nbsp;&pi;</td>
+                        <td>&theta;&nbsp;<input class="t">&nbsp;&pi;</td>
+                        <td>&theta;&nbsp;<input class="t">&nbsp;&pi;</td>
+                    </tr>
+                    <tr id="degree-row">
+                        <td></td>
+                        <td><input type="radio" name="ncoeff" value="2"></td>
+                        <td><input type="radio" name="ncoeff" value="3" checked></td>
+                        <td><input type="radio" name="ncoeff" value="4"></td>
+                        <td><input type="radio" name="ncoeff" value="5"></td>
+                        <td><input type="radio" name="ncoeff" value="6"></td>
+                        <td><input type="radio" name="ncoeff" value="7"></td>
+                    </tr>
+                </tbody>
+            </table>
+        </form></div>
+        
     </div>
     <div id="control-open" class="bordered"
          title="open settings window">
@@ -60,17 +132,49 @@
         
         <p>Re-center the image by clicking on a location.</p>
         
-        <p>Zoom in on a location by shift-clicking that location.</p>
-        
-        <p>Zoom out by ctrl-clicking.</p>
-        
-        <p>(You can also obviously use the mobile
-        <code>[&nbsp;+&nbsp;in&nbsp;]</code> and
-        <code>[&nbsp;-&nbsp;out&nbsp;]</code> buttons to zoom around the
-        center of the image.)</p>
+        <p>Zoom in/out by shift/ctrl-clicking on a location. (Or use
+        the mobile zoom buttons.)</p>
         
         <p>Click on the <code>[+]</code> in the upper-right-hand corner
-        to adjust the image size and color map.</p>
+        to adjust the image colors and generation parameters. Parameters
+        will be applied and the image regenerated when you close the
+        control window by clicking on the <code>[-]</code>.</p>
+        
+        <p><strong>View:</strong> set the dimensions of the image in pixels
+        and the factor by which the image zooms in/out when shift/ctrl
+        clicking.</p>
+        
+        <p><strong>Color:</strong> Each line in the Color table specifies a
+        color gradient to be used when coloring the image. Each pixel is shaded
+        according to how many iterations it takes for the corresponding point
+        on the complex plane to "diverge" (reach a squared modulus in excess
+        of 1,000,000) under the selected iterator.
+        </p>
+        
+        <p>For example, under the default color map, colors that take between
+        0 and 128 steps to diverge will be colored a color between black
+        (<code>#000000</code>) and white (<code>#ffffff</code>). A point
+        that takes 32 iterations to diverge will be a color one fourth of the
+        way from black to white (32/128 is 1/4) (something like
+        <code>#444444</code>). A point that takes longer than 128 iterations
+        to diverge will end up somewhere in the second gradient.</p>
+        
+        <p>Warning: If you specify a new color scheme with more total
+        "steps" than the previous one, it won't get drawn properly until
+        you click on the image to recenter (or zoom) it. I'm not sure
+        how to fix this behavior while keeping the recoloring fast.</p>
+        
+        <p><strong>Iterator:</strong> The default Mandelbrot iterator is
+        simpler (and probably faster). It is guaranteed to produce an
+        interesting image near the origin, but the "shape" or "character"
+        of that image will always be the same.</p>
+        
+        <p>The Polynomial iterator is much more flexible and capable of
+        producing practically infinite shapes and textures, but is much more
+        complicated to use. The vast majority of configurations do not result
+        in any interesting image. It is recommended that you start with
+        the default settings and make only small, incremental changes; keep
+        <var>r</var> values between 0.0 and 1.0.</p>
         
         <div id="help-close" title="close help window">[-]</div>
     </div>

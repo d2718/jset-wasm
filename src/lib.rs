@@ -112,17 +112,41 @@ it takes for their squared moduli to exceed this limit.
 */
 static SQ_MOD_LIMIT: f64 = 1_000_000.0;
 
-/// The following three values will be unused until the polynomial iterator
-/// is brought online.
+/**
+This is obviously a complex number abstraction. I only introduced it because
+I was screwing up the arithmetic in the polynomial iterator, and this made
+it easier to think about.
+*/
+#[derive(Clone, Copy)]
+struct Cx { re: f64, im: f64 }
+
+impl Cx {
+    fn add(&self, other: &Cx) -> Cx {
+        Cx {
+            re: self.re + other.re,
+            im: self.im + other.im,
+        }
+    }
+    
+    fn mul(&self, other: &Cx) -> Cx {
+        Cx {
+            re: (self.re * other.re) - (self.im * other.im),
+            im: (self.im * other.re) + (self.re * other.im),
+        }
+    }
+    
+    fn sqmod(&self) -> f64 { (self.re * self.re) + (self.im * self.im) }
+}
 
 /**
 Coefficients for the polynomial iterator. Constant term is
 `RE[0] + iIM[0]`; the sextic term is `RE[6] + iIM[6]`.
 */
-static mut RE: [f64; 7] = [1.0, 0.707, 0.0, 0.0, 0.0, 0.0, 0.0];
-static mut IM: [f64; 7] = [0.0, 0.707, 0.0, 0.0, 0.0, 0.0, 0.0];
-/// Number of coefficients currently in use by the polynomial iterator.
-static mut N_COEFFS: u8 = 7;
+//~ static mut RE: [f64; MAX_COEFFS] = [0.0; MAX_COEFFS];
+//~ static mut IM: [f64; MAX_COEFFS] = [0.0; MAX_COEFFS];
+//~ /// Number of coefficients currently in use by the polynomial iterator.
+static mut N_COEFFS: usize = 1;
+static mut COEFFS: [Cx; MAX_COEFFS] = [Cx { re: 0.0, im: 0.0 }; MAX_COEFFS ];
 
 /**
 Populate the `COLOR_MAP` based on color gradient data.
@@ -252,6 +276,32 @@ fn color_itermap(
 }
 
 /**
+Exported function to set coefficients for the polynomial iterator.
+*/
+#[no_mangle]
+pub unsafe extern fn set_coeff(n: usize, re: f64, im: f64) {
+    if n < MAX_COEFFS {
+        //~ dbg_msg("setting coeff "); dbg_num(n);
+        //~ dbg_msg(": (");
+        //~ dbg_float(re); dbg_msg(", "); dbg_float(im);
+        //~ dbg_msg(")\n");
+        
+        //RE[n] = re; IM[n] = im;
+        COEFFS[n] = Cx{ re, im };
+    }
+}
+
+/**
+Exported function to set the number of coefficients for the polynomial
+iterator to use.
+*/
+#[no_mangle]
+pub unsafe extern fn set_n_coeffs(n: usize) {
+    //~ dbg_msg("n_coeffs: "); dbg_num(n); dbg_msg("\n");
+    if n < MAX_COEFFS { N_COEFFS = n; }
+}
+
+/**
 Return how many iterations of z = z^2 + c the point `x` + i`y` takes before its
 squared modulus exceeds `sq_mod_limit` (or `iter_limit`, if it doesn't
 exceed it by `iter_limit` iterations). `iter_limit` should be the length
@@ -262,17 +312,26 @@ fn mandelbrot_iter(
     sq_mod_limit: f64, iter_limit: u16
 ) -> u16 {
     
-    let mut cur_x: f64 = 0.0;
-    let mut cur_y: f64 = 0.0;
+    //~ let mut cur_x: f64 = 0.0;
+    //~ let mut cur_y: f64 = 0.0;
+    
+    //~ for n in 0..iter_limit {
+        //~ let xsq = cur_x * cur_x;
+        //~ let ysq = cur_y * cur_y;
+        //~ if xsq + ysq > sq_mod_limit { return n; }
+        //~ cur_y = (2.0f64 * cur_x * cur_y) + y;
+        //~ cur_x = (xsq - ysq) + x;
+    //~ }
+    //~ return iter_limit;
+    
+    let c = Cx { re: x, im: y };
+    let mut cur = Cx { re: 0.0, im: 0.0 };
     
     for n in 0..iter_limit {
-        let xsq = cur_x * cur_x;
-        let ysq = cur_y * cur_y;
-        if xsq + ysq > sq_mod_limit { return n; }
-        cur_y = (2.0f64 * cur_x * cur_y) + y;
-        cur_x = (xsq - ysq) + x;
+        cur = c.add(&cur.mul(&cur));
+        if cur.sqmod() > sq_mod_limit { return n; }
     }
-    return iter_limit;
+    return  iter_limit;
 }
 
 /**
@@ -318,6 +377,74 @@ fn calc_mbrot_itermap(
     *last_map_length = map_length;
 }
 
+fn polynomial_iter(
+    x: f64, y: f64,
+    coeffs: &[Cx; MAX_COEFFS],
+    degree: usize,
+    sq_mod_limit: f64,
+    iter_limit: u16
+) -> u16 {
+    let mut cur = Cx { re: x, im: y };
+    
+    for n in 0..iter_limit {
+        let mut new = Cx { re: 0.0, im: 0.0 };
+        let mut z   = Cx { re: 1.0, im: 0.0 };
+        for m in 0..degree {
+            let t = z.mul(&coeffs[m]);
+            new = new.add(&t);
+            z = z.mul(&cur);
+        }
+        let t = z.mul(&coeffs[degree]);
+        cur = new.add(&t);
+        if cur.sqmod() > sq_mod_limit { return n; }
+    }
+    return iter_limit
+}
+
+fn calc_poly_itermap(
+    xpix: usize, ypix: usize,
+    x: f64, y: f64,
+    width: f64,
+    buff: &mut [u16; IMAGE_SIZE],
+    map_length: usize,
+    last_map_length: &mut usize,
+    coeffs: &[Cx; MAX_COEFFS],
+    n_coeffs: usize
+) {
+    // Limit our image size so that we can fit within our static buffer.
+    let xpix = if xpix > MAX_WIDTH  { MAX_WIDTH }  else { xpix };
+    let ypix = if ypix > MAX_HEIGHT { MAX_HEIGHT } else { ypix };
+    
+    // Limit number of polynomial terms to sane amount.
+    let degree = if n_coeffs < 1 { return; }    // Don't do anything; this is stupid.
+            else if n_coeffs > MAX_COEFFS { MAX_COEFFS-1 }
+            else { n_coeffs-1 };
+    
+    let xpixf = xpix as f64;
+    let ypixf = ypix as f64;
+    let height = width * ypixf / xpixf;
+    
+    let n_shades = map_length as u16;
+    
+    for yp in 0..ypix {
+        let y_val = y - height * ((yp as f64) / ypixf);
+        let idx_base: usize = yp * xpix;
+        for xp in 0..xpix {
+            let x_val = x + width * ((xp as f64) / xpixf);
+            let idx = idx_base + xp;
+            let n = polynomial_iter(
+                x_val, y_val,
+                coeffs,
+                degree,
+                SQ_MOD_LIMIT, n_shades
+            );
+            buff[idx] = n;
+        }
+    }
+    
+    *last_map_length = map_length;
+}
+
 /**
 Exported function to rewrite the `IMAGE` data after having changed the
 color gradients via calls to  `set_gradient()` and `set_n_gradients()`.
@@ -342,32 +469,54 @@ rewrite the `IMAGE` data.
 pub unsafe extern fn redraw(
     xpix: usize, ypix: usize,
     x: f64, y: f64,
-    width: f64
+    width: f64,
+    use_polynomial_iterator: bool
 ) {
-    calc_mbrot_itermap(
-        xpix, ypix, x, y, width,
-        &mut ITERMAP, CURRENT_COLORMAP_LENGTH, &mut LAST_COLORMAP_LENGTH
-    );
+    if use_polynomial_iterator {
+        calc_poly_itermap(
+            xpix, ypix, x, y, width,
+            &mut ITERMAP, CURRENT_COLORMAP_LENGTH, &mut LAST_COLORMAP_LENGTH,
+            &COEFFS, N_COEFFS
+        );
+    } else {
+        calc_mbrot_itermap(
+            xpix, ypix, x, y, width,
+            &mut ITERMAP, CURRENT_COLORMAP_LENGTH, &mut LAST_COLORMAP_LENGTH
+        );
+    }
     color_itermap(
         &ITERMAP, &COLOR_MAP, &mut IMAGE,
         DEFAULT_COLOR, xpix*ypix, CURRENT_COLORMAP_LENGTH
     );
 }
 
-//~ extern { fn dbg(c: char); }
-//~ fn dbg_msg(msg: &str) {
-    //~ for ch in msg.chars() { unsafe { dbg(ch); } }
-//~ }
-//~ fn dbg_num(n: usize) {
-    //~ let mut chz: [usize; 16] = [0usize; 16];
-    //~ let mut num = n;
-    //~ for i in 0usize..16 {
-        //~ let dig = num % 10;
-        //~ chz[i] = dig;
-        //~ num = num / 10;
-    //~ }
-    //~ for m in chz.iter().rev() {
-        //~ let ch = (*m as u8) + ('0' as u8);
-        //~ unsafe { dbg(ch as char); }
-    //~ }
-//~ }
+/* Debugging stuff that isn't necessary once it's been debugged.
+
+extern { fn dbg(c: char); }
+fn dbg_msg(msg: &str) {
+    for ch in msg.chars() { unsafe { dbg(ch); } }
+}
+fn dbg_num(n: usize) {
+    let mut chz: [usize; 16] = [0usize; 16];
+    let mut num = n;
+    for i in 0usize..16 {
+        let dig = num % 10;
+        chz[i] = dig;
+        num = num / 10;
+    }
+    for m in chz.iter().rev() {
+        let ch = (*m as u8) + ('0' as u8);
+        unsafe { dbg(ch as char); }
+    }
+}
+fn dbg_float(x: f64) {
+    let neg = x < 0.0;
+    let n = if neg { (-x * 1_000_000.0) as usize }
+            else { (x * 1_000_000.0) as usize };
+    if neg {
+        dbg_msg("f-"); dbg_num(n);
+    } else {
+        dbg_msg("f+"); dbg_num(n);
+    }
+}
+*/

@@ -68,19 +68,27 @@ div#control {
 }
 div#control > div {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     gap: 1ex;
 }
 div#control input[type="number"] { width: 12ex; }
 button.remove-gradient { font-family: monospace; }
 
+div#control > div#polynomial { display: none; }
+
+input.r,
+input.t { width: 5ex; }
+tr#degree-row td { text-align: center; }
+
 div#help {
     position: fixed;
     bottom: 1em; right: 1em;
     z-index: 4;
     display: none;
-    max-width: 60ex;
+    max-width: 90ex;
+    max-height: 90vh;
+    overflow: auto;
 }
 div#help-open {
     position: fixed;

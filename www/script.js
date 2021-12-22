@@ -101,11 +101,15 @@ Default size/zoom parameters for drawing the image. The `render_image()`
 function (below) takes an object of this form as an argument.
 */
 const DEFAULT_PARAMS = {
-    x_pixels: 1200,     // image width in pixels
-    y_pixels: 800,      // image height in pixels
+    x_pixels: 600,     // image width in pixels
+    y_pixels: 400,      // image height in pixels
     x: -2.0,            // real coordinate of upper-left-hand corner
     y: 1.0,             // imaginary coordinate of upper-left-hand corner
-    width: 3.0          // width of image on the Complex Plane
+    width: 3.0,         // width of image on the Complex Plane
+    zoom: 2.0,          // default zoom factor
+    iter: {             // iteration parameters
+        type: "mandlebrot"  // use the mandlebrot iterator by default
+    },
 };
 /*
 Zooming/panning and resising the image from the control panel stashes changes
@@ -145,7 +149,8 @@ function render_image(params) {
         params.y_pixels,
         params.x,
         params.y,
-        params.width
+        params.width,
+        (params.iter.type == "polynomial"),
     );
     
     //console.log(`post cksum: ${checksum_buffer()}`);
@@ -225,8 +230,8 @@ function new_params(click) {
     const p = current_params;
     const height = p.width * p.y_pixels / p.x_pixels;
     let zoom_factor = 1.0;
-    if (click.shift) { zoom_factor = 2.0; }
-    else if (click.ctrl) { zoom_factor = 0.5; }
+    if (click.shift) { zoom_factor = p.zoom; }
+    else if (click.ctrl) { zoom_factor = 1.0 / p.zoom; }
     
     const new_width = p.width / zoom_factor;
     const new_height = height / zoom_factor;
@@ -239,6 +244,8 @@ function new_params(click) {
         x: newx,
         y: newy,
         width: new_width,
+        zoom: p.zoom,
+        iter: p.iter,
     };
     
     current_params = np;
@@ -255,16 +262,20 @@ CANVAS.onclick = function(evt) {
 Shift- and control- clicking on mobile is tough, so for now there is this
 hack of zoom in/out buttons that fire this function.
 */
-function mobile_zoom(factor) {
+function mobile_zoom(zoom_in) {
     const p = current_params;
     const height = p.width * p.y_pixels / p.x_pixels;
-    let new_x, new_y;
-    if (factor > 1.0) {
-        new_x = p.x + p.width / (2 * factor);
-        new_y = p.y - height / (2 * factor);
+    let new_x, new_y, new_width;
+    if (zoom_in) {
+        const frac = (1 - (1/p.zoom)) / 2;
+        new_x = p.x + frac * p.width;
+        new_y = p.y - frac * height;
+        new_width = p.width / p.zoom;
     } else {
-        new_x = p.x - p.width * factor;
-        new_y = p.y + height * factor;
+        const frac = (p.zoom - 1) / 2;
+        new_x = p.x - frac * p.width;
+        new_y = p.y + frac * height;
+        new_width = p.width * p.zoom;
     }
     
     const new_params = {
@@ -272,7 +283,9 @@ function mobile_zoom(factor) {
         y_pixels: p.y_pixels,
         x: new_x,
         y: new_y,
-        width: p.width / factor,
+        width: new_width,
+        zoom: p.zoom,
+        iter: p.iter,
     };
     
     current_params = new_params;
@@ -281,69 +294,12 @@ function mobile_zoom(factor) {
 // And we add the function to the buttons.
 document.getElementById("m-zoom-in").onclick = function(evt) {
     evt.preventDefault();
-    mobile_zoom(2.0);
+    mobile_zoom(true);
 }
 document.getElementById("m-zoom-out").onclick = function(evt) {
     evt.preventDefault();
-    mobile_zoom(0.5);
+    mobile_zoom(false);
 }
-
-// Control panel elements and resizing functionality.
-
-const CONTROL = {
-    div:     document.getElementById("control"),
-    open:    document.getElementById("control-open"),
-    close:   document.getElementById("control-close"),
-    width:   document.getElementById("ixpix"),
-    height:  document.getElementById("iypix"),
-    outline: document.getElementById("canvas-outline"),
-    /*  The size we've set the canvas to by adjusting the values of
-        `CONTROL.width` and `CONTROL.height`. */
-    new_x:   DEFAULT_PARAMS.x_pixels,
-    new_y:   DEFAULT_PARAMS.y_pixels,
-};
-
-/**
-Function to shows a guide outline over the current image when the image
-size controls' values are changed.
-*/
-function resize_canvas_box() {
-    const crect = CANVAS.getBoundingClientRect();
-    const outline = CONTROL.outline;
-    outline.style.top = crect.top + "px";
-    outline.style.left = crect.left + "px";
-    outline.style.width = CONTROL.width.value + "px";
-    outline.style.height = CONTROL.height.value + "px";
-    outline.style.display = "inline-block";
-    CONTROL.new_x = parseInt(CONTROL.width.value);
-    CONTROL.new_y = parseInt(CONTROL.height.value);
-}
-
-CONTROL.open.onclick = function(evt) {
-    evt.preventDefault();
-    CONTROL.width.value = CANVAS.width;
-    CONTROL.height.value = CANVAS.height;
-    CONTROL.div.style.display = "inline-flex";
-};
-CONTROL.close.onclick = function(evt) {
-    evt.preventDefault();
-    CONTROL.div.style.display = "none";
-    // Ensure we hide the guide outline if it's showing.
-    CONTROL.outline.style.display = "none";
-    // Automatically recolor the image, even if the color map hasn't changed,
-    // because this is cheap.
-    recolor();
-    // If the size of the image has changed, rerender the image.
-    if ((CONTROL.new_x != current_params.x_pixels)
-        || (CONTROL.new_y != current_params.y_pixels))
-    {
-        current_params.x_pixels = CONTROL.new_x;
-        current_params.y_pixels = CONTROL.new_y;
-        render_image(current_params);
-    }
-};
-CONTROL.width.addEventListener("input", resize_canvas_box);
-CONTROL.height.addEventListener("input", resize_canvas_box);
 
 // Color Map
 
@@ -494,6 +450,178 @@ COLOR.add.onclick = function(evt) {
     }
     add_gradient(new_color, 256, "#000000");
 }
+
+// Iteration Parametrization
+
+const ITER = {
+    select_form: document.getElementById("iter-type"),
+    param_form:  document.getElementById("poly-params"),
+    param_div:   document.getElementById("polynomial"),
+    rvals: document.querySelectorAll("input.r"),
+    tvals: document.querySelectorAll("input.t"),
+};
+
+// Show/hide polynomial parameters or iterator selection.
+function switch_iter_type() {
+    const data = new FormData(ITER.select_form);
+    if (data.get("iter-pick") == "mandlebrot") {
+        ITER.param_div.style.display = "none";
+    } else {
+        ITER.param_div.style.display = "flex";
+    }
+}
+for (let rbutt of document.querySelectorAll('input[name="iter-pick"]')) {
+    rbutt.onclick = switch_iter_type;
+}
+
+// Disable higher-order coefficient inputs on polynomial degree selection.
+function enable_poly_inputs() {
+    const data = new FormData(ITER.param_form);
+    const n_coeffs = Number(data.get("ncoeff"));
+    const len = ITER.rvals.length;
+    for (let n = 0; n < n_coeffs; n++) {
+        ITER.rvals[n].disabled = false;
+        ITER.tvals[n].disabled = false;
+    }
+    for (let n = n_coeffs; n < len; n++) {
+        ITER.rvals[n].disabled = true;
+        ITER.tvals[n].disabled = true;
+    }
+}
+for (let rbutt of document.querySelectorAll('input[name="ncoeff"]')) {
+    rbutt.onclick = enable_poly_inputs;
+}
+// Set polynomial inputs to match default selection.
+enable_poly_inputs();
+
+ITER.get_params = function() {
+    const type_data = new FormData(ITER.select_form);
+    const iter_type = type_data.get("iter-pick");
+    
+    if (iter_type == "mandlebrot") { return { type: "mandlebrot" }; }
+    
+    const parm_data = new FormData(ITER.param_form);
+    const n_coeffs = Number(parm_data.get("ncoeff"));
+    
+    const re = new Array();
+    const im = new Array();
+    for (let n = 0; n < n_coeffs; n++) {
+        const r = Number(ITER.rvals[n].value);
+        const pi_t = Number(ITER.tvals[n].value) * Math.PI;
+        re.push(r * Math.cos(pi_t));
+        im.push(r * Math.sin(pi_t));
+    }
+    
+    return {
+        type: "polynomial",
+        n: n_coeffs,
+        re: re,
+        im: im,
+    };
+}
+
+ITER.set_params = function(p) {
+    if (p.type == "mandlebrot") { return; }
+    
+    for (let n = 0; n < p.n; n++) {
+        jswmod.exports.set_coeff(n, p.re[n], p.im[n]);
+    }
+    jswmod.exports.set_n_coeffs(p.n);
+}
+
+// Control panel elements and resizing functionality.
+
+const CONTROL = {
+    div:     document.getElementById("control"),
+    open:    document.getElementById("control-open"),
+    close:   document.getElementById("control-close"),
+    width:   document.getElementById("ixpix"),
+    height:  document.getElementById("iypix"),
+    outline: document.getElementById("canvas-outline"),
+    zoom_bar: document.getElementById("izbar"),
+    zoom_num: document.getElementById("iznum"),
+    /*  The size we've set the canvas to by adjusting the values of
+        `CONTROL.width` and `CONTROL.height`. */
+    new_x:   DEFAULT_PARAMS.x_pixels,
+    new_y:   DEFAULT_PARAMS.y_pixels,
+};
+
+/**
+Function to shows a guide outline over the current image when the image
+size controls' values are changed.
+*/
+function resize_canvas_box() {
+    const crect = CANVAS.getBoundingClientRect();
+    const outline = CONTROL.outline;
+    outline.style.top = crect.top + "px";
+    outline.style.left = crect.left + "px";
+    outline.style.width = CONTROL.width.value + "px";
+    outline.style.height = CONTROL.height.value + "px";
+    outline.style.display = "inline-block";
+    CONTROL.new_x = parseInt(CONTROL.width.value);
+    CONTROL.new_y = parseInt(CONTROL.height.value);
+}
+
+function set_zoom(evt) {
+    console.log(evt);
+    const new_z = Number(evt.target.value);
+    if (new_z) {
+        current_params.zoom = new_z;
+        if (CONTROL.zoom_bar == evt.target) {
+            CONTROL.zoom_num.value = new_z;
+        } else {
+            CONTROL.zoom_bar.value = new_z;
+        }
+    }
+}
+CONTROL.zoom_bar.addEventListener("input", set_zoom);
+CONTROL.zoom_num.addEventListener("input", set_zoom);
+
+CONTROL.open.onclick = function(evt) {
+    evt.preventDefault();
+    CONTROL.width.value = CANVAS.width;
+    CONTROL.height.value = CANVAS.height;
+    CONTROL.div.style.display = "inline-flex";
+};
+CONTROL.close.onclick = function(evt) {
+    evt.preventDefault();
+    CONTROL.div.style.display = "none";
+    // Ensure we hide the guide outline if it's showing.
+    CONTROL.outline.style.display = "none";
+    const iter_params = ITER.get_params();
+    console.log(iter_params);
+    ITER.set_params(iter_params);
+    
+    // Check to see if we should re-render the image.
+    let re_render = false;
+    // yes, if the size of the image has changed...
+    if ((CONTROL.new_x != current_params.x_pixels)
+        || (CONTROL.new_y != current_params.y_pixels))
+    { re_render = true; }
+    // of if any of the iterations parameters have changed
+    for (let k in iter_params) {
+        if (iter_params.hasOwnProperty(k)) {
+            if (iter_params[k] != current_params.iter[k]) {
+                re_render = true;
+                break;
+            }
+        }
+    }
+    
+    if (re_render) {
+        COLOR.update_map();
+        current_params.x_pixels = CONTROL.new_x;
+        current_params.y_pixels = CONTROL.new_y;
+        current_params.iter = iter_params;
+        render_image(current_params);
+    // Otherwise just recolor the image automatically, even if the color map
+    // hasn't changed, because this is cheap.
+    } else {
+        recolor();
+    }
+};
+CONTROL.width.addEventListener("input", resize_canvas_box);
+CONTROL.height.addEventListener("input", resize_canvas_box);
 
 // Help
 
