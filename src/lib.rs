@@ -149,22 +149,45 @@ static mut COEFFS: [Cx; MAX_COEFFS] = [Cx { re: 0.0, im: 0.0 }; MAX_COEFFS ];
 /// Number of coefficients currently in use by the polynomial iterator.
 static mut N_COEFFS: usize = 1;
 
+/**
+To make the value of `iterator` field of the `DrawParams` struct below
+impossible to mistake.
+*/.
 #[derive(Clone, Copy)]
 enum IteratorType {
     Mandelbrot,
     Polynomial,
 }
 
+/**
+Stores components about the size of the image and its coverage of the
+complex plane. This makes the call to `reiterate()` (and thus `recolor()`
+require no external parameters). It also makes calls to `iterate()` and
+its subfunctions require fewer parameters and thus easier to look at.
+Honestly, it also seemed to reduce binary size when introduced, for some
+reason.
+*/
 struct DrawParams {
+    /// width of image in pixels
     xpix: usize,
+    /// height of image in pixels
     ypix: usize,
+    /// real coordinate of upper-left-hand corner of image
     x: f64,
+    /// imaginary coordinate of upper-left-hand corner of image
     y: f64,
+    /// width of image on the complex plane
     width: f64,
+    /// total number of shades in the last-used colormap
     colormap_length: usize,
+    /// last-used iterator
     iterator: IteratorType,
 }
 
+/**
+Default `DrawParams`, really only here because `static`s require initial
+values. They get overwritten before they're needed.
+*/
 static mut DRAW_PARAMS: DrawParams = DrawParams {
     xpix: 1200, ypix: 800, x: -2.0, y: 1.0, width: 3.0,
     colormap_length: 128,
@@ -339,14 +362,11 @@ fn mandelbrot_iter(
 }
 
 /**
-Given the pixel dimensions of the image (`xpix`, `ypix`), the coordinates of
-the upper-left-hand corner of the image (`x`, `y`), and the width of the
-image on the Complex Plane (`width`), fill the appropriate amount of
-`ITERMAP` (passed as `&mut buff`) with iteration data.
+Given the image and complex plane coverage parameters in `dp`, fill the
+appropriate amount of `ITERMAP` (passed as `&mut buff`) with iteration data.
 
 `map_length` is the length of the data in `COLOR_MAP` (that is, the value
-of `CURRENT_COLORMAP_LENGTH`); `last_map_length` is an `&mut` to
-`LAST_COLORMAP_LENGTH`, which it sets when it's done.
+of `CURRENT_COLORMAP_LENGTH`).
 */
 fn calc_mbrot_itermap(
     dp: &DrawParams,
@@ -447,24 +467,11 @@ fn calc_poly_itermap(
 }
 
 /**
-Exported function to rewrite the `IMAGE` data after having changed the
-color gradients via calls to  `set_gradient()` and `set_n_gradients()`.
+Given the provided `DrawParams`, the current color `map_length`, and
+references to the polynomial coefficients `coeff` (and their number,
+`n_coeff`), pick the proper iterator and fill the appropriate amount of
+`ITERMAP` (passed `&mut` as `itermap`) with iteration data.
 */
-#[no_mangle]
-pub unsafe extern fn recolor() {
-    if DRAW_PARAMS.colormap_length < CURRENT_COLORMAP_LENGTH {
-        reiterate(
-            &DRAW_PARAMS, &mut ITERMAP, CURRENT_COLORMAP_LENGTH,
-            &COEFFS, N_COEFFS
-        );
-    }
-    DRAW_PARAMS.colormap_length = CURRENT_COLORMAP_LENGTH;
-    color_itermap(
-        &ITERMAP, &COLOR_MAP, &mut IMAGE, DEFAULT_COLOR,
-        DRAW_PARAMS.xpix * DRAW_PARAMS.ypix, CURRENT_COLORMAP_LENGTH
-    );
-}
-
 fn iterate(
     dp: &mut DrawParams,
     itermap: &mut [u16; IMAGE_SIZE],
@@ -483,6 +490,13 @@ fn iterate(
     dp.colormap_length = map_length;
 }
 
+/**
+This function is used in calls to `recolor()`. If the length of the color
+map has increased since the last time `iterate()` was called, this function
+will use the last-used iterator to reiterate _only_ the points who would
+have iterated off the end of the old color map. This makes recoloring still
+pretty fast while working as one would expect.
+*/
 fn reiterate(
     dp: &DrawParams,
     buff: &mut [u16; IMAGE_SIZE],
@@ -558,6 +572,25 @@ pub unsafe extern fn redraw(
     iterate(&mut DRAW_PARAMS, &mut ITERMAP, CURRENT_COLORMAP_LENGTH,
             &COEFFS, N_COEFFS);
     
+    color_itermap(
+        &ITERMAP, &COLOR_MAP, &mut IMAGE, DEFAULT_COLOR,
+        DRAW_PARAMS.xpix * DRAW_PARAMS.ypix, CURRENT_COLORMAP_LENGTH
+    );
+}
+
+/**
+Exported function to rewrite the `IMAGE` data after having changed the
+color gradients via calls to  `set_gradient()` and `set_n_gradients()`.
+*/
+#[no_mangle]
+pub unsafe extern fn recolor() {
+    if DRAW_PARAMS.colormap_length < CURRENT_COLORMAP_LENGTH {
+        reiterate(
+            &DRAW_PARAMS, &mut ITERMAP, CURRENT_COLORMAP_LENGTH,
+            &COEFFS, N_COEFFS
+        );
+    }
+    DRAW_PARAMS.colormap_length = CURRENT_COLORMAP_LENGTH;
     color_itermap(
         &ITERMAP, &COLOR_MAP, &mut IMAGE, DEFAULT_COLOR,
         DRAW_PARAMS.xpix * DRAW_PARAMS.ypix, CURRENT_COLORMAP_LENGTH

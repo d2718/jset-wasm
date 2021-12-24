@@ -108,26 +108,30 @@ wasm_mod.instance.exports.set_gradient(0, 0, 255, 0,   0,   0, 255, 256);
 wasm_mod.instance.exports.set_gradient(0, 0, 255, 255, 0,   0,   0, 256);
 wasm_mod.instance.exports.set_n_gradients(3); // We just specified 3 gradients.
 
-wasm_mod.instance.exports.recolor(xpix, ypix); // <-- This call right here.
+wasm_mod.instance.exports.recolor(); // <-- This call right here.
 
 // Then we need to shove the data into the <canvas> again.
 const data = new ImageData(
     new UInt8ClampedArray(
         wasm_mod.instance.exports.memory.buffer,
         wasm_mod.instance.exports.BUFFER.value,
-        4 * xpix * ypix     // 4 bytes of data per pixel
+        4 * xpix * ypix
     ),
-    xpix                    // image width in pixels
+    xpix
 );
 const canvas = document.getElementById("your-canvas");
 canvas.getContext("2d").putImageData(data, 0, 0);
 ```
 
-There is one caveat here: If you specify a new color map that is _longer_ than
+~~There is one caveat here: If you specify a new color map that is _longer_ than
 the old color map (that is, the sum of the number of shades in the collection
 of gradients is larger), it won't display properly until you call `redraw()`
 again. I don't think it's possible to fix this while keeping the `recolor()`
-call fast.
+call fast.~~ This has been changed so that if the color map is extended,
+the iterator will make another pass through the image, but _only_ operate on
+the points that would have iterated off the end of the old color map. I think
+this is a good compromise; it keeps recoloring relatively fast unless you have
+a lot of slow-diverging (or non-diverging) points in the image.
 
 ## Plans
 
@@ -135,6 +139,8 @@ All the core functionality is now implemented.
 
   * ~~user-specifiable polynomial iteration~~ done!
   * ~~user-specifiable color map~~ done!
+  * user-specifiable "default" color (the one used when the iterator runs
+    out of colormap before a point diverges)
   * perhaps some type of smoothing, blurring, or downsampling
   * improved UI of the web interface
     + drag-resizable canvas
