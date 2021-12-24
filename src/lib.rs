@@ -452,10 +452,12 @@ color gradients via calls to  `set_gradient()` and `set_n_gradients()`.
 */
 #[no_mangle]
 pub unsafe extern fn recolor() {
-    reiterate(
-        &DRAW_PARAMS, &mut ITERMAP, CURRENT_COLORMAP_LENGTH,
-        &COEFFS, N_COEFFS
-    );
+    if DRAW_PARAMS.colormap_length < CURRENT_COLORMAP_LENGTH {
+        reiterate(
+            &DRAW_PARAMS, &mut ITERMAP, CURRENT_COLORMAP_LENGTH,
+            &COEFFS, N_COEFFS
+        );
+    }
     DRAW_PARAMS.colormap_length = CURRENT_COLORMAP_LENGTH;
     color_itermap(
         &ITERMAP, &COLOR_MAP, &mut IMAGE, DEFAULT_COLOR,
