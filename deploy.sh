@@ -2,7 +2,13 @@
 
 TARGET=d2718.net:~/wr/jset/
 
+curl -X POST --data-urlencode 'input@www/script.js' \
+     https://www.toptal.com/developers/javascript-minifier/raw > www/min.js
+
+curl -X POST --data-urlencode 'input@www/style.css' \
+    https://www.toptal.com/developers/cssminifier/raw > www/min.css
+
 scp www/index.html $TARGET
 scp www/jset_web.wasm $TARGET
-scp www/script.js $TARGET
-scp www/style.css $TARGET
+scp www/min.js $TARGET/script.js
+scp www/min.css $TARGET/style.css

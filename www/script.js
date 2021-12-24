@@ -29,10 +29,10 @@ function panique() {
     pdiv.style.display = "block";
 }
 
-/*
-Utility function for explicitly removing all all the DOM nodes beneath
-a given element. (To clear it, or in preparation for removing it.)
-*/
+//~ /*
+//~ Utility function for explicitly removing all all the DOM nodes beneath
+//~ a given element. (To clear it, or in preparation for removing it.)
+//~ */
 function recursive_clear(elt) {
     while (elt.firstChild) {
         recursive_clear(elt.lastChild);
@@ -58,25 +58,14 @@ Methods for showing/setting the contents of/hiding a status div, but they
 don't seem to work all the time, so IDK.
 */
 const STATUS = {
-    set: function(txt) {
-        const div = document.getElementById("status");
-        console.log(`Setting status: "${txt}"`);
-        recursive_clear(div);
-        div.appendChild(document.createTextNode(txt));
-        div.style.display = "inline-block";
-    },
-    add: function(txt) {
-        const div = document.getElementById("status");
-        console.log(`Adding status: "${txt}"`);
-        div.appendChild(document.createTextNode("\n"));
-        div.appendChild(document.createTextNode(txt));
-        div.style.display = "inline-block";
-    },
-    hide: function() {
-        const div = document.getElementById("status");
-        console.log("hiding status...")
-        div.style.display = "none";
-    },
+    div: document.getElementById("status"),
+};
+STATUS.show = function(txt) {
+    STATUS.div.innerHTML = txt;
+    STATUS.div.style.display = "block";
+};
+STATUS.hide = function() {
+    STATUS.div.style.display = "none";
 };
 
 /*
@@ -90,7 +79,6 @@ function checksum_buffer() {
         jswmod.exports.BUFFER.value,
         4 * 1920 * 1080
     );
-    
     let csum = 0;
     for (let n of arr) { csum = csum + n; }
     return csum % 1000;
@@ -140,7 +128,7 @@ image parameters. Takes an argument with the same structure as the
 `DEFAULT_PARAMS` constant, above.
 */
 function render_image(params) {
-    STATUS.set("Drawing...");
+    STATUS.show("Drawing...");
     //console.log(params);
     //console.log(` pre cksum: ${checksum_buffer()}`);
 
@@ -160,7 +148,7 @@ function render_image(params) {
 }
 
 function recolor() {
-    STATUS.set("Coloring...");
+    STATUS.show("Coloring...");
     const params = current_params;
     //console.log(params);
     //console.log(` pre cksum: ${checksum_buffer()}`);
@@ -175,7 +163,7 @@ Fetch the wasm module and generate an image with the default parameters.
 None of the other stuff on the page can really happen until this is called.
 */
 async function init() {
-    STATUS.set("Loading...");
+    STATUS.show("Loading...");
     WebAssembly.instantiateStreaming(
         fetch(WASM_URI),
         { "env": { 
@@ -190,7 +178,7 @@ async function init() {
         COLOR.update_map();
         render_image(DEFAULT_PARAMS);
     }).catch(function(err) {
-        STATUS.set("Error fetching WASM module; see console.");
+        STATUS.show("Error fetching WASM module; see console.");
         console.log(err);
     });
 }
@@ -439,7 +427,6 @@ for (const tup of COLOR.defaults) {
     add_gradient(tup[0], tup[1], tup[2]);
 }
 COLOR.current_params = COLOR.get_params();
-console.log(COLOR.current_params);
 
 COLOR.add.onclick = function(evt) { 
     evt.preventDefault();
@@ -563,7 +550,6 @@ function resize_canvas_box() {
 }
 
 function set_zoom(evt) {
-    console.log(evt);
     const new_z = Number(evt.target.value);
     if (new_z) {
         current_params.zoom = new_z;
@@ -589,7 +575,6 @@ CONTROL.close.onclick = function(evt) {
     // Ensure we hide the guide outline if it's showing.
     CONTROL.outline.style.display = "none";
     const iter_params = ITER.get_params();
-    console.log(iter_params);
     ITER.set_params(iter_params);
     
     // Check to see if we should re-render the image.
@@ -599,13 +584,8 @@ CONTROL.close.onclick = function(evt) {
         || (CONTROL.new_y != current_params.y_pixels))
     { re_render = true; }
     // of if any of the iterations parameters have changed
-    for (let k in iter_params) {
-        if (iter_params.hasOwnProperty(k)) {
-            if (iter_params[k] != current_params.iter[k]) {
-                re_render = true;
-                break;
-            }
-        }
+    if (JSON.stringify(iter_params) != JSON.stringify(current_params.iter)) {
+        re_render = true;
     }
     
     if (re_render) {
@@ -636,5 +616,14 @@ HELP.open.onclick = function() {
 HELP.close.onclick = function() {
     HELP.div.style.display = "none";
 }
+
+const RELOAD_WARNING = "This annoying \"Are you suuuuuure?!?!??\" message makes this suck less on mobile.";
+
+function annoying_are_you_sure(evt) {
+    evt.preventDefault();
+    evt.returnValue = RELOAD_WARNING;
+    return RELOAD_WARNING;
+}
+window.addEventListener("beforeunload", annoying_are_you_sure);
 
 init();

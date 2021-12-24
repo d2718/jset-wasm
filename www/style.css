@@ -4,10 +4,12 @@
 body {
     background-color: #222;
     color: #cde;
-    z-index: 0;
+    font-family: Merriweather;
 }
 div { box-sizing: border-box; }
 p { text-align: justify; }
+input, button { font-family: Inconsolata; }
+strong { color: lavenderblush; }
 
 div#dbg {
     white-space: pre;
@@ -21,7 +23,7 @@ div.bordered {
 }
 div#status {
     position: fixed;
-    top: 1em; left: 1em;
+    left: 1em; top: 1em;
     z-index: 5;
     display: none;
 }
@@ -39,8 +41,8 @@ div#canvas-outline {
 }
 button#m-zoom-in,
 button#m-zoom-out {
-    height: 3em;
-    width: 8em;
+    height: 4em;
+    width: 10em;
     text-align: center;
     font-family: monospace;
 }
@@ -65,6 +67,8 @@ div#control {
     flex-direction: column;
     align-items: stretch;
     gap: 1ex;
+    max-height: 90vh;
+    overflow: auto;
 }
 div#control > div {
     display: flex;
@@ -78,8 +82,12 @@ button.remove-gradient { font-family: monospace; }
 div#control > div#polynomial { display: none; }
 
 input.r,
-input.t { width: 5ex; }
+input.t {
+    width: 7ex;
+    font-size: smaller;
+}
 tr#degree-row td { text-align: center; }
+div#polynomial tbody td { padding: 0 1ex; }
 
 div#help {
     position: fixed;
