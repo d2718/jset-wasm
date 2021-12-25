@@ -10,122 +10,141 @@
 </head>
 <body>
     <div id="status" class="bordered"></div>
-    <canvas id="demo-canvas"></canvas><br>
     <div id="canvas-outline"></div>
-    Mobile zoom controls:
-    <button type="button" id="m-zoom-in">
+    <canvas id="demo-canvas"></canvas><br>
+    Mobile controls:
+    <button type="button" id="m-zoom-in" class="m">
         <label for="m-zoom-in">[ + in ]</label>
     </button>
-    <button type="button" id="m-zoom-out">
+    <button type="button" id="m-zoom-out" class="m">
         <label for="m-zoom-out">[ - out ]</label>
+    </button>
+    <button type="button" id="m-save" class="m">
+        <label for="m-save">save</label>
     </button>
     
     <div id="control" class="bordered">
-        <div id="control-close">
-            <div title="close this window and apply changes">[-]</div>
-        </div>
-        <div><h3>View</h3></div>
-        <div>
-            <label for="ixpix">Width:</label>
-            <input type="number" id="ixpix"
-                   min="64" max="1920" value="400">
-        </div>
-        <div>
-            <label for="iypix">Height:</label>
-            <input type="number" id="iypix"
-                   min="64" max="1080" value="300">
-        </div>
-        <div>
-            <label for="izbar">Zoom:</label>
-            <input type="range" id="izbar" min="1.0" max="10.0"
-                   step="0.1", value="2.0">
-        </div>
-        <div>
-            <input type="number" id="iznum" min="1.0" max="10.0"
-                   step="0.1" value="2.0">
-        </div>
-        
-        <div><h3>Color</h3></div>
-        <div id="color-map">
-            <table>
-                <thead><tr>
-                    <th>from</th><th>steps</th><th>to</th><th>del</th>
-                </tr></thead>
-                <tbody>
-                </tbody>
-            </table><br>
-        </div>
-        <div>
-            <button type="button" id="add-color"
-                    title="add a color gradient">
-                <label for="add-color">+ gradient</label>
-            </button>
-        </div>
-        
-        <div><h3>Iteration</h3></div>
-        
-        <div id="iterator-choice">
-            <div>Iterator:</div>
-            <div><form id="iter-type">
-                <label>
-                <input type="radio" id="iter-mbrot" value="mandlebrot"
-                       name="iter-pick" checked>&nbsp;Mandlebrot
-                </label>
-                <br>
-                <label>
-                <input type="radio" id="iter-poly"
-                       name="iter-pick" value="polynomial">&nbsp;Polynomial
-                </label>
+        <div id="iter-column">
+            
+            <div><h3>Iteration</h3></div>
+            
+            <div id="iterator-choice">
+                <div><form id="iter-type">
+                    <label>
+                    <input type="radio" id="iter-mbrot" value="mandlebrot"
+                           name="iter-pick" checked>&nbsp;Mandlebrot
+                    </label>
+                    <br>
+                    <label>
+                    <input type="radio" id="iter-poly"
+                           name="iter-pick" value="polynomial">&nbsp;Polynomial
+                    </label>
+                </form></div>
+            </div>
+            
+            <div id="polynomial"><form id="poly-params">
+                <table>
+                    <tbody>
+                        <tr>
+                            <th><var>c</var></th>
+                            <td><var>r</var>&nbsp;<input class="r" value="0.7"></td>
+                            <td><var>&theta;</var>&nbsp;<input class="t" value="0.63">&nbsp;&pi;</td>
+                            <td>&deg;</td>
+                        </tr>
+                        <tr>
+                            <th><var>z</var></th>
+                            <td><var>r</var>&nbsp;<input class="r" value="0.0"></td>
+                            <td><var>&theta;</var>&nbsp;<input class="t" value="0.0">&nbsp;&pi;</td>
+                            <td><input type="radio" name="ncoeff" value="2"></td>
+                        </tr>
+                        <tr>
+                            <th><var>z<sup>2</sup></var></th>
+                            <td><var>r</var>&nbsp;<input class="r" value="1.0"></td>
+                            <td><var>&theta;</var>&nbsp;<input class="t" value="0.0">&nbsp;&pi;</td>
+                            <td><input type="radio" name="ncoeff" value="3" checked></td>
+                        </tr>
+                        <tr>
+                            <th><var>z<sup>3</sup></var></th>
+                            <td><var>r</var>&nbsp;<input class="r"></td>
+                            <td><var>&theta;</var>&nbsp;<input class="t">&nbsp;&pi;</td>
+                            <td><input type="radio" name="ncoeff" value="4"></td>
+                        </tr>
+                        <tr>
+                            <th><var>z<sup>4</sup></var></th>
+                            <td><var>r</var>&nbsp;<input class="r"></td>
+                            <td><var>&theta;</var>&nbsp;<input class="t">&nbsp;&pi;</td>
+                            <td><input type="radio" name="ncoeff" value="5"></td>
+                        </tr>
+                        <tr>
+                            <th><var>z<sup>5</sup></var></th>
+                            <td><var>r</var>&nbsp;<input class="r"></td>
+                            <td><var>&theta;</var>&nbsp;<input class="t">&nbsp;&pi;</td>
+                            <td><input type="radio" name="ncoeff" value="6"></td>
+                        </tr>
+                        <tr>
+                        </tr>
+                            <th><var>z<sup>6</sup></var></th>
+                            <td><var>r</var>&nbsp;<input class="r"></td>
+                            <td><var>&theta;</var>&nbsp;<input class="t">&nbsp;&pi;</td>
+                            <td><input type="radio" name="ncoeff" value="7"></td>
+                        </tr>
+                    </tbody>
+                </table>
             </form></div>
+            
+            
         </div>
         
-        <div id="polynomial"><form id="poly-params">
-            <table>
-                <thead><tr>
-                    <th><var>c</var></th>
-                    <th><var>z</var></th>
-                    <th><var>z<sup>2</sup></var></th>
-                    <th><var>z<sup>3</sup></var></th>
-                    <th><var>z<sup>4</sup></var></th>
-                    <th><var>z<sup>5</sup></var></th>
-                    <th><var>z<sup>6</sup></var></th>
-                </tr></thead>
-                <tbody>
-                    <tr>
-                        <td><var>r</var>&nbsp;<input class="r" value="0.7"></td>
-                        <td><var>r</var>&nbsp;<input class="r" value="0.0"></td>
-                        <td><var>r</var>&nbsp;<input class="r" value="1.0"></td>
-                        <td><var>r</var>&nbsp;<input class="r"></td>
-                        <td><var>r</var>&nbsp;<input class="r"></td>
-                        <td><var>r</var>&nbsp;<input class="r"></td>
-                        <td><var>r</var>&nbsp;<input class="r"></td>
-                    </tr>
-                    <tr>
-                        <td><var>&theta;</var>&nbsp;<input class="t" value="0.63">&nbsp;&pi;</td>
-                        <td><var>&theta;</var>&nbsp;<input class="t" value="0.0">&nbsp;&pi;</td>
-                        <td><var>&theta;</var>&nbsp;<input class="t" value="0.0">&nbsp;&pi;</td>
-                        <td><var>&theta;</var>&nbsp;<input class="t">&nbsp;&pi;</td>
-                        <td><var>&theta;</var>&nbsp;<input class="t">&nbsp;&pi;</td>
-                        <td><var>&theta;</var>&nbsp;<input class="t">&nbsp;&pi;</td>
-                        <td><var>&theta;</var>&nbsp;<input class="t">&nbsp;&pi;</td>
-                    </tr>
-                    <tr id="degree-row">
-                        <td>degree:</td>
-                        <td><input type="radio" name="ncoeff" value="2"></td>
-                        <td><input type="radio" name="ncoeff" value="3" checked></td>
-                        <td><input type="radio" name="ncoeff" value="4"></td>
-                        <td><input type="radio" name="ncoeff" value="5"></td>
-                        <td><input type="radio" name="ncoeff" value="6"></td>
-                        <td><input type="radio" name="ncoeff" value="7"></td>
-                    </tr>
-                </tbody>
-            </table>
-        </form></div>
+        <div id="other-column">
         
+            <div id="control-close">
+                <span title="close this window and apply changes"
+                      class="icon">&#x1fbb1;</span>
+            </div>
+            <div><h3>View</h3></div>
+            <div>
+                <label for="ixpix">Width:</label>
+                <input type="number" id="ixpix"
+                       min="64" max="1920" value="400">
+            </div>
+            <div>
+                <label for="iypix">Height:</label>
+                <input type="number" id="iypix"
+                       min="64" max="1080" value="300">
+            </div>
+            <div>
+                <label for="izbar">Zoom:</label>
+                <input type="range" id="izbar" min="1.0" max="10.0"
+                       step="0.1", value="2.0">
+            </div>
+            <div>
+                <input type="number" id="iznum" min="1.0" max="10.0"
+                       step="0.1" value="2.0">
+            </div>
+            
+            <div><h3>Color</h3></div>
+            <div id="color-map">
+                <table>
+                    <thead><tr>
+                        <th>from</th><th>steps</th><th>to</th><th>del</th>
+                    </tr></thead>
+                    <tbody>
+                    </tbody>
+                </table><br>
+            </div>
+            <div>
+                <button type="button" id="add-color"
+                        title="add a color gradient">
+                    <label for="add-color">+ gradient</label>
+                </button>
+            </div>
+        
+        </div>
     </div>
+    
     <div id="control-open" class="bordered"
          title="open settings window">
-        <div>[+]</div>
+        <span class="icon">&#x2699;</span>
     </div>
     
     <div id="help" class="bordered">
@@ -135,10 +154,10 @@
         <p>Zoom in/out by shift/ctrl-clicking on a location. (Or use
         the mobile zoom buttons.)</p>
         
-        <p>Click on the <code>[+]</code> in the upper-right-hand corner
+        <p>Click on the &#x2699; in the upper-right-hand corner
         to adjust the image colors and generation parameters. Parameters
         will be applied and the image regenerated when you close the
-        control window by clicking on the <code>[-]</code>.</p>
+        control window by clicking on the &#x1fbb1;.</p>
         
         <p><strong>View:</strong> set the dimensions of the image in pixels
         and the factor by which the image zooms in/out when shift/ctrl
@@ -158,11 +177,6 @@
         way from black to white (32/128 is 1/4) (something like
         <code>#444444</code>). A point that takes longer than 128 iterations
         to diverge will end up somewhere in the second gradient.</p>
-        
-        <p>Warning: If you specify a new color scheme with more total
-        "steps" than the previous one, it won't get drawn properly until
-        you click on the image to recenter (or zoom) it. I'm not sure
-        how to fix this behavior while keeping the recoloring fast.</p>
         
         <p><strong>Iterator:</strong> The default Mandelbrot iterator is
         simpler (and probably faster). It is guaranteed to produce an

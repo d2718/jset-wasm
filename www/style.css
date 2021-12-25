@@ -9,7 +9,9 @@ body {
 div { box-sizing: border-box; }
 p { text-align: justify; }
 input, button { font-family: Inconsolata; }
+button { background-color: #bbb; }
 strong { color: lavenderblush; }
+span.icon { font-size: 16pt; }
 
 div#dbg {
     white-space: pre;
@@ -39,54 +41,48 @@ div#canvas-outline {
     box-sizing: border-box;
     display: none;
 }
-button#m-zoom-in,
-button#m-zoom-out {
+button.m {
     height: 4em;
     width: 10em;
-    text-align: center;
-    font-family: monospace;
 }
 
 div#control-open {
     position: fixed;
     top: 1em; right: 1em;
+    width: 5em; height: 5em;
     z-index: 3;
     cursor: default;
 }
-div#control-open div { font-family: monospace; }
-div#control div#control-close {
-    justify-content: flex-end;
-    cursor: default;
-    font-family: monospace;
+div#control-open span {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
 }
+div#control div#control-close { cursor: default; }
 div#control {
     position: fixed;
     top: 1em; right: 1em;
     z-index: 4;
     display: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1ex;
     max-height: 90vh;
     overflow: auto;
 }
+div#control div { gap: 1ex; }
 div#control > div {
     display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 1ex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-end;
 }
 div#control input[type="number"] { width: 12ex; }
-button.remove-gradient { font-family: monospace; }
 
-div#control > div#polynomial { display: none; }
+div#control div#polynomial { display: none; }
 
 input.r,
 input.t {
-    width: 7ex;
+    width: 8ex;
     font-size: smaller;
 }
-tr#degree-row td { text-align: center; }
 div#polynomial tbody td { padding: 0 1ex; }
 
 div#help {
@@ -94,7 +90,8 @@ div#help {
     bottom: 1em; right: 1em;
     z-index: 4;
     display: none;
-    max-width: 90ex;
+    width: 90ex;
+    max-width: 90vw;
     max-height: 90vh;
     overflow: auto;
 }

@@ -288,6 +288,15 @@ document.getElementById("m-zoom-out").onclick = function(evt) {
     evt.preventDefault();
     mobile_zoom(false);
 }
+// Let's add the unsupported-right-click-save function here, too.
+document.getElementById("m-save").onclick = function(evt) {
+    evt.preventDefault();
+    const img_url = CANVAS.toDataURL("image/png").replace("image/png", "image/octet-stream");
+    const link = document.createElement("a");
+    link.download = `${Date.now()}.png`;
+    link.href = img_url;
+    link.click();
+}
 
 // Color Map
 
@@ -467,11 +476,16 @@ function enable_poly_inputs() {
     const len = ITER.rvals.length;
     for (let n = 0; n < n_coeffs; n++) {
         ITER.rvals[n].disabled = false;
+        ITER.rvals[n].style.opacity = "1.0";
         ITER.tvals[n].disabled = false;
+        ITER.tvals[n].style.opacity = "1.0";
+
     }
     for (let n = n_coeffs; n < len; n++) {
         ITER.rvals[n].disabled = true;
+        ITER.rvals[n].style.opacity = "0.5";
         ITER.tvals[n].disabled = true;
+        ITER.tvals[n].style.opacity = "0.5";
     }
 }
 for (let rbutt of document.querySelectorAll('input[name="ncoeff"]')) {
