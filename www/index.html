@@ -10,14 +10,17 @@
 </head>
 <body>
     <div id="status" class="bordered"></div>
-    <canvas id="demo-canvas"></canvas><br>
     <div id="canvas-outline"></div>
-    Mobile zoom controls:
-    <button type="button" id="m-zoom-in">
+    <canvas id="demo-canvas"></canvas><br>
+    Mobile controls:
+    <button type="button" id="m-zoom-in" class="m">
         <label for="m-zoom-in">[ + in ]</label>
     </button>
-    <button type="button" id="m-zoom-out">
+    <button type="button" id="m-zoom-out" class="m">
         <label for="m-zoom-out">[ - out ]</label>
+    </button>
+    <button type="button" id="m-save" class="m">
+        <label for="m-save">save</label>
     </button>
     
     <div id="control" class="bordered">
@@ -46,7 +49,7 @@
                             <th><var>c</var></th>
                             <td><var>r</var>&nbsp;<input class="r" value="0.7"></td>
                             <td><var>&theta;</var>&nbsp;<input class="t" value="0.63">&nbsp;&pi;</td>
-                            <td>deg</td>
+                            <td>&deg;</td>
                         </tr>
                         <tr>
                             <th><var>z</var></th>
@@ -174,11 +177,6 @@
         way from black to white (32/128 is 1/4) (something like
         <code>#444444</code>). A point that takes longer than 128 iterations
         to diverge will end up somewhere in the second gradient.</p>
-        
-        <p>Warning: If you specify a new color scheme with more total
-        "steps" than the previous one, it won't get drawn properly until
-        you click on the image to recenter (or zoom) it. I'm not sure
-        how to fix this behavior while keeping the recoloring fast.</p>
         
         <p><strong>Iterator:</strong> The default Mandelbrot iterator is
         simpler (and probably faster). It is guaranteed to produce an
