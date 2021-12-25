@@ -371,8 +371,7 @@ COLOR.update_map = function() {
     }
     jswmod.exports.set_n_gradients(p.n_steps);
     jswmod.exports.update_color_map();
-    const iparms = current_params;
-    jswmod.exports.recolor(iparms.x_pixels, iparms.y_pixels);
+    jswmod.exports.recolor();
 }
 
 function add_gradient(start, steps, end) {

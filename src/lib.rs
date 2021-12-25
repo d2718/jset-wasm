@@ -100,11 +100,7 @@ static mut SHADES: [u16; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
 static mut N_GRADIENTS: usize = 7;
 /// The color to color points that iterate past the end of the gradient.
 static DEFAULT_COLOR: u32 = 0xFF_00_00_00;
-/**
-The number of shades in the _last used_ colormap. This is currently unused,
-but will be useful when coloration without reiteration is refined.
-*/
-static mut LAST_COLORMAP_LENGTH: usize = 0;
+
 /**
 The number of shades in the last _calculated_ color map. This should be the
 number used by the _currently running_ coloring routine.
@@ -152,6 +148,51 @@ static mut COEFFS: [Cx; MAX_COEFFS] = [Cx { re: 0.0, im: 0.0 }; MAX_COEFFS ];
 
 /// Number of coefficients currently in use by the polynomial iterator.
 static mut N_COEFFS: usize = 1;
+
+/**
+To make the value of `iterator` field of the `DrawParams` struct below
+impossible to mistake.
+*/.
+#[derive(Clone, Copy)]
+enum IteratorType {
+    Mandelbrot,
+    Polynomial,
+}
+
+/**
+Stores components about the size of the image and its coverage of the
+complex plane. This makes the call to `reiterate()` (and thus `recolor()`
+require no external parameters). It also makes calls to `iterate()` and
+its subfunctions require fewer parameters and thus easier to look at.
+Honestly, it also seemed to reduce binary size when introduced, for some
+reason.
+*/
+struct DrawParams {
+    /// width of image in pixels
+    xpix: usize,
+    /// height of image in pixels
+    ypix: usize,
+    /// real coordinate of upper-left-hand corner of image
+    x: f64,
+    /// imaginary coordinate of upper-left-hand corner of image
+    y: f64,
+    /// width of image on the complex plane
+    width: f64,
+    /// total number of shades in the last-used colormap
+    colormap_length: usize,
+    /// last-used iterator
+    iterator: IteratorType,
+}
+
+/**
+Default `DrawParams`, really only here because `static`s require initial
+values. They get overwritten before they're needed.
+*/
+static mut DRAW_PARAMS: DrawParams = DrawParams {
+    xpix: 1200, ypix: 800, x: -2.0, y: 1.0, width: 3.0,
+    colormap_length: 128,
+    iterator: IteratorType::Mandelbrot,
+};
 
 /**
 Populate the `COLOR_MAP` based on color gradient data.
@@ -321,45 +362,33 @@ fn mandelbrot_iter(
 }
 
 /**
-Given the pixel dimensions of the image (`xpix`, `ypix`), the coordinates of
-the upper-left-hand corner of the image (`x`, `y`), and the width of the
-image on the Complex Plane (`width`), fill the appropriate amount of
-`ITERMAP` (passed as `&mut buff`) with iteration data.
+Given the image and complex plane coverage parameters in `dp`, fill the
+appropriate amount of `ITERMAP` (passed as `&mut buff`) with iteration data.
 
 `map_length` is the length of the data in `COLOR_MAP` (that is, the value
-of `CURRENT_COLORMAP_LENGTH`); `last_map_length` is an `&mut` to
-`LAST_COLORMAP_LENGTH`, which it sets when it's done.
+of `CURRENT_COLORMAP_LENGTH`).
 */
 fn calc_mbrot_itermap(
-    xpix: usize, ypix: usize,
-    x: f64, y: f64,
-    width: f64,
+    dp: &DrawParams,
     buff: &mut [u16; IMAGE_SIZE],
     map_length: usize,
-    last_map_length: &mut usize
 ) {
-    // Limit our image size so that we can fit within our static buffer.
-    let xpix = if xpix > MAX_WIDTH  { MAX_WIDTH }  else { xpix };
-    let ypix = if ypix > MAX_HEIGHT { MAX_HEIGHT } else { ypix };
-    
-    let xpixf = xpix as f64;
-    let ypixf = ypix as f64;
-    let height = width * ypixf / xpixf;
+    let xpixf = dp.xpix as f64;
+    let ypixf = dp.ypix as f64;
+    let height = dp.width * ypixf / xpixf;
     
     let n_shades = map_length as u16;
     
-    for yp in 0..ypix {
-        let y_val = y - height * ((yp as f64) / ypixf);
-        let idx_base: usize = yp * xpix;
-        for xp in 0..xpix {
-            let x_val = x + width * ((xp as f64) / xpixf);
+    for yp in 0..dp.ypix {
+        let y_val = dp.y - height * ((yp as f64) / ypixf);
+        let idx_base: usize = yp * dp.xpix;
+        for xp in 0..dp.xpix {
+            let x_val = dp.x + dp.width * ((xp as f64) / xpixf);
             let idx = idx_base + xp;
             let n = mandelbrot_iter(x_val, y_val, SQ_MOD_LIMIT, n_shades);
             buff[idx] = n;
         }
     }
-    
-    *last_map_length = map_length;
 }
 
 /**
@@ -403,35 +432,28 @@ two extra arguments at the end specify the polynomial:
   * `n_coeffs` should be the values of `N_COEFFS`
 */
 fn calc_poly_itermap(
-    xpix: usize, ypix: usize,
-    x: f64, y: f64,
-    width: f64,
+    dp: &DrawParams,
     buff: &mut [u16; IMAGE_SIZE],
     map_length: usize,
-    last_map_length: &mut usize,
     coeffs: &[Cx; MAX_COEFFS],
     n_coeffs: usize
 ) {
-    // Limit our image size so that we can fit within our static buffer.
-    let xpix = if xpix > MAX_WIDTH  { MAX_WIDTH }  else { xpix };
-    let ypix = if ypix > MAX_HEIGHT { MAX_HEIGHT } else { ypix };
-    
     // Limit number of polynomial terms to sane amount.
     let degree = if n_coeffs < 1 { return; }    // Stop; this is stupid.
             else if n_coeffs > MAX_COEFFS { MAX_COEFFS-1 }
             else { n_coeffs-1 };
     
-    let xpixf = xpix as f64;
-    let ypixf = ypix as f64;
-    let height = width * ypixf / xpixf;
+    let xpixf = dp.xpix as f64;
+    let ypixf = dp.ypix as f64;
+    let height = dp.width * ypixf / xpixf;
     
     let n_shades = map_length as u16;
     
-    for yp in 0..ypix {
-        let y_val = y - height * ((yp as f64) / ypixf);
-        let idx_base: usize = yp * xpix;
-        for xp in 0..xpix {
-            let x_val = x + width * ((xp as f64) / xpixf);
+    for yp in 0..dp.ypix {
+        let y_val = dp.y - height * ((yp as f64) / ypixf);
+        let idx_base: usize = yp * dp.xpix;
+        for xp in 0..dp.xpix {
+            let x_val = dp.x + dp.width * ((xp as f64) / xpixf);
             let idx = idx_base + xp;
             let n = polynomial_iter(
                 x_val, y_val,
@@ -442,20 +464,80 @@ fn calc_poly_itermap(
             buff[idx] = n;
         }
     }
-    
-    *last_map_length = map_length;
 }
 
 /**
-Exported function to rewrite the `IMAGE` data after having changed the
-color gradients via calls to  `set_gradient()` and `set_n_gradients()`.
+Given the provided `DrawParams`, the current color `map_length`, and
+references to the polynomial coefficients `coeff` (and their number,
+`n_coeff`), pick the proper iterator and fill the appropriate amount of
+`ITERMAP` (passed `&mut` as `itermap`) with iteration data.
 */
-#[no_mangle]
-pub unsafe extern fn recolor(xpix: usize, ypix: usize) {
-    color_itermap(
-        &ITERMAP, &COLOR_MAP, &mut IMAGE,
-        DEFAULT_COLOR, xpix*ypix, CURRENT_COLORMAP_LENGTH
-    );
+fn iterate(
+    dp: &mut DrawParams,
+    itermap: &mut [u16; IMAGE_SIZE],
+    map_length: usize,
+    coeffs: &[Cx; MAX_COEFFS],
+    n_coeffs: usize,
+) {
+    let itertype = dp.iterator;
+    
+    match itertype {
+        IteratorType::Mandelbrot => calc_mbrot_itermap(dp, itermap, map_length),
+        IteratorType::Polynomial => calc_poly_itermap(dp, itermap, map_length,
+                                        coeffs, n_coeffs),
+    };
+    
+    dp.colormap_length = map_length;
+}
+
+/**
+This function is used in calls to `recolor()`. If the length of the color
+map has increased since the last time `iterate()` was called, this function
+will use the last-used iterator to reiterate _only_ the points who would
+have iterated off the end of the old color map. This makes recoloring still
+pretty fast while working as one would expect.
+*/
+fn reiterate(
+    dp: &DrawParams,
+    buff: &mut [u16; IMAGE_SIZE],
+    map_length: usize,
+    coeffs: &[Cx; MAX_COEFFS],
+    n_coeffs: usize,
+) {
+    // Limit number of polynomial terms to sane amount.
+    let degree = if n_coeffs < 1 { return; }    // Stop; this is stupid.
+            else if n_coeffs > MAX_COEFFS { MAX_COEFFS-1 }
+            else { n_coeffs-1 };
+    
+    let xpixf = dp.xpix as f64;
+    let ypixf = dp.ypix as f64;
+    let height = dp.width * ypixf / xpixf;
+    
+    let n_shades = map_length as u16;
+    let old_n_shades = dp.colormap_length as u16;
+    let iterator = dp.iterator;
+    
+    for yp in 0..dp.ypix {
+        let y_val = dp.y - height * ((yp as f64) / ypixf);
+        let idx_base: usize = yp * dp.xpix;
+        for xp in 0..dp.xpix {
+            let idx = idx_base + xp;
+            if buff[idx] >= old_n_shades {
+                let x_val = dp.x + dp.width * ((xp as f64) / xpixf);
+                let n = match iterator {
+                    IteratorType::Mandelbrot => mandelbrot_iter(
+                        x_val, y_val, SQ_MOD_LIMIT, n_shades
+                    ),
+                    IteratorType::Polynomial => polynomial_iter(
+                        x_val, y_val,
+                        coeffs, degree,
+                        SQ_MOD_LIMIT, n_shades
+                    ),
+                };
+                buff[idx] = n;
+            }
+        }
+    }
 }
 
 /**
@@ -471,26 +553,47 @@ rewrite the `IMAGE` data.
 */
 #[no_mangle]
 pub unsafe extern fn redraw(
-    xpix: usize, ypix: usize,
-    x: f64, y: f64,
-    width: f64,
+    x_pixels: usize, y_pixels: usize,
+    re: f64, im: f64,
+    img_width: f64,
     use_polynomial_iterator: bool
 ) {
-    if use_polynomial_iterator {
-        calc_poly_itermap(
-            xpix, ypix, x, y, width,
-            &mut ITERMAP, CURRENT_COLORMAP_LENGTH, &mut LAST_COLORMAP_LENGTH,
+    DRAW_PARAMS = DrawParams {
+        xpix: if x_pixels > MAX_WIDTH  { MAX_WIDTH  } else { x_pixels },
+        ypix: if y_pixels > MAX_HEIGHT { MAX_HEIGHT } else { y_pixels },
+        x: re, y: im, width: img_width,
+        colormap_length: DRAW_PARAMS.colormap_length,
+        iterator: match use_polynomial_iterator {
+            true  => IteratorType::Polynomial,
+            false => IteratorType::Mandelbrot,
+        },
+    };
+    
+    iterate(&mut DRAW_PARAMS, &mut ITERMAP, CURRENT_COLORMAP_LENGTH,
+            &COEFFS, N_COEFFS);
+    
+    color_itermap(
+        &ITERMAP, &COLOR_MAP, &mut IMAGE, DEFAULT_COLOR,
+        DRAW_PARAMS.xpix * DRAW_PARAMS.ypix, CURRENT_COLORMAP_LENGTH
+    );
+}
+
+/**
+Exported function to rewrite the `IMAGE` data after having changed the
+color gradients via calls to  `set_gradient()` and `set_n_gradients()`.
+*/
+#[no_mangle]
+pub unsafe extern fn recolor() {
+    if DRAW_PARAMS.colormap_length < CURRENT_COLORMAP_LENGTH {
+        reiterate(
+            &DRAW_PARAMS, &mut ITERMAP, CURRENT_COLORMAP_LENGTH,
             &COEFFS, N_COEFFS
         );
-    } else {
-        calc_mbrot_itermap(
-            xpix, ypix, x, y, width,
-            &mut ITERMAP, CURRENT_COLORMAP_LENGTH, &mut LAST_COLORMAP_LENGTH
-        );
     }
+    DRAW_PARAMS.colormap_length = CURRENT_COLORMAP_LENGTH;
     color_itermap(
-        &ITERMAP, &COLOR_MAP, &mut IMAGE,
-        DEFAULT_COLOR, xpix*ypix, CURRENT_COLORMAP_LENGTH
+        &ITERMAP, &COLOR_MAP, &mut IMAGE, DEFAULT_COLOR,
+        DRAW_PARAMS.xpix * DRAW_PARAMS.ypix, CURRENT_COLORMAP_LENGTH
     );
 }
 
