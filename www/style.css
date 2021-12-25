@@ -10,6 +10,7 @@ div { box-sizing: border-box; }
 p { text-align: justify; }
 input, button { font-family: Inconsolata; }
 strong { color: lavenderblush; }
+span.icon { font-size: 16pt; }
 
 div#dbg {
     white-space: pre;
@@ -50,30 +51,32 @@ button#m-zoom-out {
 div#control-open {
     position: fixed;
     top: 1em; right: 1em;
+    width: 5em; height: 5em;
     z-index: 3;
     cursor: default;
 }
-div#control-open div { font-family: monospace; }
+div#control-open span {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+}
 div#control div#control-close {
     justify-content: flex-end;
     cursor: default;
-    font-family: monospace;
 }
 div#control {
     position: fixed;
     top: 1em; right: 1em;
     z-index: 4;
     display: none;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 1ex;
     max-height: 90vh;
     overflow: auto;
 }
 div#control > div {
     display: flex;
-    justify-content: flex-end;
-    align-items: center;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: flex-end;
     gap: 1ex;
 }
 div#control input[type="number"] { width: 12ex; }
@@ -83,7 +86,7 @@ div#control > div#polynomial { display: none; }
 
 input.r,
 input.t {
-    width: 7ex;
+    width: 8ex;
     font-size: smaller;
 }
 tr#degree-row td { text-align: center; }
