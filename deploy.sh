@@ -10,5 +10,8 @@ curl -X POST --data-urlencode 'input@www/style.css' \
 
 scp www/index.html $TARGET
 scp www/jset_web.wasm $TARGET
+scp www/icomoon.woff $TARGET
 scp www/min.js $TARGET/script.js
+rm www/min.js
 scp www/min.css $TARGET/style.css
+rm www/min.css

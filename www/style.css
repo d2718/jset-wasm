@@ -1,5 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Merriweather&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Inconsolata&display=swap');
+@font-face {
+    font-family: icomoon;
+    src: url("icomoon.woff");
+}
 
 body {
     background-color: #222;
@@ -8,10 +12,26 @@ body {
 }
 div { box-sizing: border-box; }
 p { text-align: justify; }
-input, button { font-family: Inconsolata; }
+a { color: #8ae; text-decoration: none; }
+a:visited { color: #89a; }
+a:hover { color: #8ac; text-decoration: underline; }
+code { font-family: Inconsolata; }
 button { background-color: #bbb; }
+input { font-family: Inconsolata; }
 strong { color: lavenderblush; }
-span.icon { font-size: 16pt; }
+.icon { font-family: icomoon; font-size: x-large; }
+.inline-icon { font-family: icomoon; }
+.arrow { cursor: default; }
+.opener {
+    position: fixed;
+    width: 5em; height: 5em;
+    z-index: 3;
+}
+.opener span {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+}
 
 div#dbg {
     white-space: pre;
@@ -41,24 +61,10 @@ div#canvas-outline {
     box-sizing: border-box;
     display: none;
 }
-button.m {
-    height: 4em;
-    width: 10em;
-}
+button.m { height: 4em; width: 4em; }
 
-div#control-open {
-    position: fixed;
-    top: 1em; right: 1em;
-    width: 5em; height: 5em;
-    z-index: 3;
-    cursor: default;
-}
-div#control-open span {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-}
-div#control div#control-close { cursor: default; }
+div#control-open { top: 1em; right: 1em; }
+
 div#control {
     position: fixed;
     top: 1em; right: 1em;
@@ -74,7 +80,8 @@ div#control > div {
     justify-content: flex-start;
     align-items: flex-end;
 }
-div#control input[type="number"] { width: 12ex; }
+div#control div#other-column > div { display: flex; align-items: center; }
+div#control input[type="number"] { width: 10ex; }
 
 div#control div#polynomial { display: none; }
 
@@ -84,6 +91,24 @@ input.t {
     font-size: smaller;
 }
 div#polynomial tbody td { padding: 0 1ex; }
+
+div#about {
+    position: fixed;
+    top: 50%; right: 1em;
+    transform: translate(0%, -50%);
+    display: none;
+    flex-direction: column;
+    align-items: flex-end;
+    z-index: 4;
+    gap: 1ex;
+}
+div#about > * {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1ex;
+}
+div#about-open { top: 50%; right: 1em; transform: translate(0%, -50%); }
 
 div#help {
     position: fixed;
@@ -96,17 +121,10 @@ div#help {
     overflow: auto;
 }
 div#help-open {
-    position: fixed;
     bottom: 1em; right: 1em;
-    z-index: 3;
     cursor: help;
 }
-div#help-open div { font-family: monospace; }
-div#help-close {
-    text-align: right;
-    font-family: monospace;
-    cursor: default;
-}
+div#help-close { text-align: right; }
 
 div#panic-background {
     position: fixed;

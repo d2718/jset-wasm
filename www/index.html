@@ -13,14 +13,14 @@
     <div id="canvas-outline"></div>
     <canvas id="demo-canvas"></canvas><br>
     Mobile controls:
-    <button type="button" id="m-zoom-in" class="m">
-        <label for="m-zoom-in">[ + in ]</label>
+    <button type="button" id="m-zoom-in" class="m" title="zoom in">
+        <label for="m-zoom-in" class="icon">&#xe987;</label>
     </button>
-    <button type="button" id="m-zoom-out" class="m">
-        <label for="m-zoom-out">[ - out ]</label>
+    <button type="button" id="m-zoom-out" class="m" title="zoom out">
+        <label for="m-zoom-out" class="icon">&#xe988;</label>
     </button>
-    <button type="button" id="m-save" class="m">
-        <label for="m-save">save</label>
+    <button type="button" id="m-save" class="m" title="download &amp; save">
+        <label for="m-save" class="icon">&#xe9c7;</label>
     </button>
     
     <div id="control" class="bordered">
@@ -99,7 +99,7 @@
         
             <div id="control-close">
                 <span title="close this window and apply changes"
-                      class="icon">&#x1fbb1;</span>
+                      class="icon arrow">&#xea52;</span>
             </div>
             <div><h3>View</h3></div>
             <div>
@@ -133,18 +133,37 @@
                 </table><br>
             </div>
             <div>
-                <button type="button" id="add-color"
+                <span>add gradient:</span>
+                <span class="icon arrow" id="add-color"
                         title="add a color gradient">
-                    <label for="add-color">+ gradient</label>
-                </button>
+                    &#xea0a;
+                </span>
             </div>
         
         </div>
     </div>
     
-    <div id="control-open" class="bordered"
+    <div id="control-open" class="bordered opener"
          title="open settings window">
-        <span class="icon">&#x2699;</span>
+        <span class="icon arrow">&#xe993;</span>
+    </div>
+    
+    <div id="about" class="bordered">
+        <a href="https://www.instagram.com/dx2718/"
+           title="instagram: @dx2718">
+           <span>@dx2718</span>
+            <span class="icon">&#xea92;</span>
+        </a>
+        <a href="https://github.com/d2718/jset-wasm"
+           title="github: d2718/jset-wasm">
+            <code>d2718/jset-wasm</code>
+            <span class="icon">&#xeab0;</span>
+        </a>
+        <div id="about-close" class="icon arrow">&#xea0f;</div>
+    </div>
+    
+    <div id="about-open" class="bordered opener" title="links">
+        <span class="icon arrow">&#xea0c;</span>
     </div>
     
     <div id="help" class="bordered">
@@ -154,10 +173,11 @@
         <p>Zoom in/out by shift/ctrl-clicking on a location. (Or use
         the mobile zoom buttons.)</p>
         
-        <p>Click on the &#x2699; in the upper-right-hand corner
-        to adjust the image colors and generation parameters. Parameters
-        will be applied and the image regenerated when you close the
-        control window by clicking on the &#x1fbb1;.</p>
+        <p>Click on the <span class="inline-icon">&#xe993;</span>; in the 
+        upper-right-hand corner to adjust the image colors and generation
+        parameters. Parameters will be applied and the image regenerated when
+        you close the control window by clicking on the
+        <span class="inline-icon">&#xea52;</span>.</p>
         
         <p><strong>View:</strong> set the dimensions of the image in pixels
         and the factor by which the image zooms in/out when shift/ctrl
@@ -190,11 +210,11 @@
         the default settings and make only small, incremental changes; keep
         <var>r</var> values between 0.0 and 1.0.</p>
         
-        <div id="help-close" title="close help window">[-]</div>
+        <div id="help-close" title="close help window"
+             class="icon">&#xea0f;</div>
     </div>
-    <div id="help-open" class="bordered"
-         title="help/about">
-         <div>[?]</div>
+    <div id="help-open" class="bordered opener" title="help">
+         <span class="icon">&#xea09;</span></span>
     </div>
     
     <div id="panic-background">

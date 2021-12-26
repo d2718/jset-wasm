@@ -415,16 +415,17 @@ function add_gradient(start, steps, end) {
     tr.appendChild(etd);
     
     const dtd = document.createElement("td");
-    const dbutt = document.createElement("button");
-    dbutt.type = "button";
-    dbutt.appendChild(document.createTextNode("[x]"));
-    dbutt.title = "remove this color gradient";
-    dbutt.setAttribute("class", "remove-gradient");
-    dbutt.onclick = function() {
+    //const dbutt = document.createElement("button");
+    //dbutt.type = "button";
+    dtd.setAttribute("class", "icon arrow");
+    dtd.innerHTML = "&#xea0f;";
+    dtd.title = "remove this color gradient";
+    //dbutt.setAttribute("class", "remove-gradient");
+    dtd.onclick = function() {
         recursive_clear(tr);
         tr.parentElement.removeChild(tr);
     }
-    dtd.appendChild(dbutt);
+    //dtd.appendChild(dbutt);
     tr.appendChild(dtd);
     
     COLOR.tbody.appendChild(tr);
@@ -616,6 +617,15 @@ CONTROL.close.onclick = function(evt) {
 CONTROL.width.addEventListener("input", resize_canvas_box);
 CONTROL.height.addEventListener("input", resize_canvas_box);
 
+// About
+const ABOUT = {
+        div:   document.getElementById("about"),
+        open:  document.getElementById("about-open"),
+        close: document.getElementById("about-close"),
+};
+ABOUT.open.onclick = function() { ABOUT.div.style.display = "inline-flex"; };
+ABOUT.close.onclick = function() { ABOUT.div.style.display = "none"; };
+
 // Help
 
 const HELP = {
@@ -623,12 +633,8 @@ const HELP = {
     open:   document.getElementById("help-open"),
     close:  document.getElementById("help-close"),
 };
-HELP.open.onclick = function() {
-    HELP.div.style.display = "inline-block";
-}
-HELP.close.onclick = function() {
-    HELP.div.style.display = "none";
-}
+HELP.open.onclick = function() { HELP.div.style.display = "inline-block"; };
+HELP.close.onclick = function() { HELP.div.style.display = "none"; };
 
 const RELOAD_WARNING = "This annoying \"Are you suuuuuure?!?!??\" message makes this suck less on mobile.";
 
