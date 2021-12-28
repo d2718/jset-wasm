@@ -9,7 +9,7 @@ curl -X POST --data-urlencode 'input@www/style.css' \
     https://www.toptal.com/developers/cssminifier/raw > www/min.css
 
 scp www/index.html $TARGET
-scp www/jset_web.wasm $TARGET
+scp www/jset_wasm.wasm $TARGET
 scp www/icomoon.woff $TARGET
 scp www/min.js $TARGET/script.js
 rm www/min.js

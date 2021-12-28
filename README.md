@@ -13,7 +13,7 @@ the following steps:
 ```javascript
     let wasm_mod = {};
     WebAssembly.instantiateStreaming(
-        fetch("http:// ... /jset_web.wasm"),
+        fetch("http:// ... /jset_wasm.wasm"),
         {
             "env": {
                 "pnk": your_panic_alert_function,
@@ -78,7 +78,8 @@ especially the higher-degree ones.
         x,      // real coordinate of upper-left-hand corner of image
         y,      // imaginary coordinate of upper-left-hand corner of image
         width,  // width of image on the Complex plane
-        poly_p  // boolean indicating whenther to use the polynomial iterator
+        poly_p, // boolean indicating whenther to use the polynomial iterator
+        smooth  // desired intensity of smoothing (from 0.0 to 1.0)
     );
 ```
 
@@ -141,7 +142,9 @@ All the core functionality is now implemented.
   * ~~user-specifiable color map~~ done!
   * user-specifiable "default" color (the one used when the iterator runs
     out of colormap before a point diverges)
-  * perhaps some type of smoothing, blurring, or downsampling
+  * ~~perhaps some type of smoothing, blurring, or downsampling~~ I added a
+    parameter for a very simple smoothing pass. It's not as bad as I though it
+    might have been; it's very subtle, even at full intensity.
   * improved UI of the web interface
     + drag-resizable canvas
     + better ergonomics/visuals for entering polynomial coefficients

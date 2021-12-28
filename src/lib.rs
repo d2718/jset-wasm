@@ -99,7 +99,7 @@ static mut SHADES: [u16; MAX_GRADIENTS] = [0; MAX_GRADIENTS];
 /// The number of gradients in the current color scheme.
 static mut N_GRADIENTS: usize = 7;
 /// The color to color points that iterate past the end of the gradient.
-static DEFAULT_COLOR: u32 = 0xFF_00_00_00;
+static mut DEFAULT_COLOR: u32 = 0xFF_00_00_00;
 
 /**
 The number of shades in the last _calculated_ color map. This should be the
@@ -279,6 +279,17 @@ steps to use.
 #[no_mangle]
 pub unsafe fn set_n_gradients(n: usize) { 
     if n < MAX_GRADIENTS { N_GRADIENTS = n; }
+}
+
+/**
+Exported function to set the "default" color, the color a pixel will get
+if iterating its point exhausts the color map.
+*/
+#[no_mangle]
+pub unsafe fn set_default(r: u8, g: u8, b: u8) {
+    let col: u32 = (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
+                                      | 0xFF_00_00_00u32;
+    DEFAULT_COLOR = col;
 }
 
 /**

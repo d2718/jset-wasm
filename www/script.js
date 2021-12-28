@@ -307,9 +307,10 @@ document.getElementById("m-save").onclick = function(evt) {
 const COLOR = {
     MAX_STEPS:  16,
     MAX_SHADES: 65535-1,
-    tbody:  document.querySelector("div#color-map table tbody"),
-    add:    document.getElementById("add-color"),
-    hexre:  /[0-9a-fA-F][0-9a-fA-F]/g,
+    tbody:   document.querySelector("div#color-map table tbody"),
+    add:     document.getElementById("add-color"),
+    default: document.getElementById("idcolor"),
+    hexre:   /[0-9a-fA-F][0-9a-fA-F]/g,
     defaults: [
         ["#000000", 128, "#ffffff"],
         ["#ffffff", 256, "#000000"],
@@ -346,6 +347,7 @@ COLOR.get_params = function() {
         b_ends:   new Array(),
         n_steps:  steps.length,
         shades:   steps,
+        default:  COLOR.to_rgb(COLOR.default.value),
     };
     
     for (const rgb of froms) {
@@ -384,6 +386,7 @@ COLOR.update_map = function() {
     }
     jswmod.exports.set_n_gradients(p.n_steps);
     jswmod.exports.update_color_map();
+    jswmod.exports.set_default(p.default[0], p.default[1], p.default[2]);
     jswmod.exports.recolor();
 }
 
@@ -586,8 +589,9 @@ CONTROL.zoom_num.addEventListener("input", set_zoom);
 
 function set_smooth(evt) {
     const new_sm = Number(evt.target.value);
-    if (new_sm) {
+    if (new_sm != NaN) {
         CONTROL.new_smooth = new_sm;
+        console.log(new_sm);
         if (CONTROL.smooth_bar == evt.target) {
             CONTROL.smooth_num.value = new_sm;
         } else {
