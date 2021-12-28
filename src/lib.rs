@@ -581,7 +581,7 @@ const ORTH: f32 = 0.184699031259;
 const DIAG: f32 = 0.130601937482;
 
 fn smooth_image(dp: &DrawParams, amt: f32, buff: &mut [u32; IMAGE_SIZE]) {
-    dbg_msg("smoothing: "); dbg_float(amt as f64); dbg_msg("\n");
+    //dbg_msg("smoothing: "); dbg_float(amt as f64); dbg_msg("\n");
     let orth = ORTH * amt;
     let diag = DIAG * amt;
     let targ = 1.0 - (2.0*orth + diag);
@@ -682,7 +682,7 @@ pub unsafe extern fn recolor() {
     }
 }
 
-/* Debugging stuff that isn't necessary once it's been debugged. */
+/* Debugging stuff that isn't necessary once it's been debugged.
 
 extern { fn dbg(c: char); }
 fn dbg_msg(msg: &str) {
@@ -711,3 +711,4 @@ fn dbg_float(x: f64) {
         dbg_msg("f+"); dbg_num(n);
     }
 }
+*/
