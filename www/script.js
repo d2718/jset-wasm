@@ -1,7 +1,7 @@
 
 "use strict";
 
-const WASM_URI = "jset_web.wasm";
+const WASM_URI = "jset_wasm.wasm";
 
 /*
 `debug_chars` and `debug_char()` are to allow the wasm module to print debug
@@ -95,6 +95,7 @@ const DEFAULT_PARAMS = {
     y: 1.0,             // imaginary coordinate of upper-left-hand corner
     width: 3.0,         // width of image on the Complex Plane
     zoom: 2.0,          // default zoom factor
+    smooth: 0.0,        // default smoothing amount
     iter: {             // iteration parameters
         type: "mandlebrot"  // use the mandlebrot iterator by default
     },
@@ -139,6 +140,7 @@ function render_image(params) {
         params.y,
         params.width,
         (params.iter.type == "polynomial"),
+        params.smooth,
     );
     
     //console.log(`post cksum: ${checksum_buffer()}`);
@@ -233,6 +235,7 @@ function new_params(click) {
         y: newy,
         width: new_width,
         zoom: p.zoom,
+        smooth: p.smooth,
         iter: p.iter,
     };
     
@@ -273,6 +276,7 @@ function mobile_zoom(zoom_in) {
         y: new_y,
         width: new_width,
         zoom: p.zoom,
+        smooth: p.smooth,
         iter: p.iter,
     };
     
@@ -541,10 +545,13 @@ const CONTROL = {
     outline: document.getElementById("canvas-outline"),
     zoom_bar: document.getElementById("izbar"),
     zoom_num: document.getElementById("iznum"),
+    smooth_bar: document.getElementById("ismbar"),
+    smooth_num: document.getElementById("ismnum"),
     /*  The size we've set the canvas to by adjusting the values of
         `CONTROL.width` and `CONTROL.height`. */
     new_x:   DEFAULT_PARAMS.x_pixels,
     new_y:   DEFAULT_PARAMS.y_pixels,
+    new_smooth: DEFAULT_PARAMS.smooth,
 };
 
 /**
@@ -577,6 +584,20 @@ function set_zoom(evt) {
 CONTROL.zoom_bar.addEventListener("input", set_zoom);
 CONTROL.zoom_num.addEventListener("input", set_zoom);
 
+function set_smooth(evt) {
+    const new_sm = Number(evt.target.value);
+    if (new_sm) {
+        CONTROL.new_smooth = new_sm;
+        if (CONTROL.smooth_bar == evt.target) {
+            CONTROL.smooth_num.value = new_sm;
+        } else {
+            CONTROL.smooth_bar.value = new_sm;
+        }
+    }
+}
+CONTROL.smooth_bar.addEventListener("input", set_smooth);
+CONTROL.smooth_num.addEventListener("input", set_smooth);
+
 CONTROL.open.onclick = function(evt) {
     evt.preventDefault();
     CONTROL.width.value = CANVAS.width;
@@ -595,7 +616,9 @@ CONTROL.close.onclick = function(evt) {
     let re_render = false;
     // yes, if the size of the image has changed...
     if ((CONTROL.new_x != current_params.x_pixels)
-        || (CONTROL.new_y != current_params.y_pixels))
+        || (CONTROL.new_y != current_params.y_pixels)
+        // or the smoothness setting
+        || (CONTROL.new_smooth != current_params.smooth))
     { re_render = true; }
     // of if any of the iterations parameters have changed
     if (JSON.stringify(iter_params) != JSON.stringify(current_params.iter)) {
@@ -606,6 +629,7 @@ CONTROL.close.onclick = function(evt) {
         COLOR.update_map();
         current_params.x_pixels = CONTROL.new_x;
         current_params.y_pixels = CONTROL.new_y;
+        current_params.smooth   = CONTROL.new_smooth;
         current_params.iter = iter_params;
         render_image(current_params);
     // Otherwise just recolor the image automatically, even if the color map

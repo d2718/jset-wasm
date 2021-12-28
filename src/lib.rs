@@ -152,7 +152,7 @@ static mut N_COEFFS: usize = 1;
 /**
 To make the value of `iterator` field of the `DrawParams` struct below
 impossible to mistake.
-*/.
+*/
 #[derive(Clone, Copy)]
 enum IteratorType {
     Mandelbrot,
@@ -182,6 +182,8 @@ struct DrawParams {
     colormap_length: usize,
     /// last-used iterator
     iterator: IteratorType,
+    /// smoothing amount
+    smooth_frac: Option<f32>,
 }
 
 /**
@@ -192,6 +194,7 @@ static mut DRAW_PARAMS: DrawParams = DrawParams {
     xpix: 1200, ypix: 800, x: -2.0, y: 1.0, width: 3.0,
     colormap_length: 128,
     iterator: IteratorType::Mandelbrot,
+    smooth_frac: None,
 };
 
 /**
@@ -540,6 +543,77 @@ fn reiterate(
     }
 }
 
+struct PixVal { r: f32, g: f32, b: f32 }
+
+impl PixVal {
+    fn from_u32(n: u32) -> Self {
+        let ru = n & 0xFF;
+        let gu = (n & 0xFF_00) >> 8;
+        let bu = (n & 0xFF_00_00) >> 16;
+        
+        PixVal { r: ru as f32, g: gu as f32, b: bu as f32 }
+    }
+    
+    fn to_u32(&self) -> u32 {
+        let rn = self.r as u32;
+        let gn = (self.r as u32) << 8;
+        let bn = (self.r as u32) << 16;
+        
+        rn | gn | bn | 0xFF_00_00_00
+    }
+    
+    fn scale(&mut self, a: f32) -> PixVal {
+        PixVal {
+            r: self.r * a,
+            g: self.g * a,
+            b: self.b * a,
+        }
+    }
+    
+    fn add(&mut self, p: &Self) {
+        self.r = self.r + p.r;
+        self.g = self.g + p.g;
+        self.b = self.b + p.b;
+    } 
+}
+
+const ORTH: f32 = 0.184699031259;
+const DIAG: f32 = 0.130601937482;
+
+fn smooth_image(dp: &DrawParams, amt: f32, buff: &mut [u32; IMAGE_SIZE]) {
+    dbg_msg("smoothing: "); dbg_float(amt as f64); dbg_msg("\n");
+    let orth = ORTH * amt;
+    let diag = DIAG * amt;
+    let targ = 1.0 - (2.0*orth + diag);
+    let edge_targ = 1.0 - orth;
+    
+    for y in 0..(dp.ypix - 1) {
+        let idx_base = y * dp.xpix;
+        for x in 0..(dp.xpix - 1) {
+            let idx = idx_base + x;
+            let mut here = PixVal::from_u32(buff[idx]).scale(targ);
+            let rt = PixVal::from_u32(buff[idx+1]).scale(orth);
+            let dn = PixVal::from_u32(buff[idx+dp.xpix]).scale(orth);
+            let dg = PixVal::from_u32(buff[idx+dp.xpix+1]).scale(diag);
+            here.add(&rt); here.add(&dn); here.add(&dg);
+            buff[idx] = here.to_u32();
+        }
+        let idx = idx_base + dp.xpix - 1;
+        let mut here = PixVal::from_u32(buff[idx]).scale(edge_targ);
+        let dn = PixVal::from_u32(buff[idx+dp.xpix]).scale(orth);
+        here.add(&dn);
+        buff[idx] = here.to_u32();
+    }
+    
+    let idx_base = (dp.ypix-1) * dp.xpix;
+    for idx in idx_base..(idx_base + dp.xpix - 1) {
+        let mut here = PixVal::from_u32(buff[idx]).scale(edge_targ);
+        let rt = PixVal::from_u32(buff[idx+1]).scale(orth);
+        here.add(&rt);
+        buff[idx] = here.to_u32();
+    }
+}
+
 /**
 Exported function to rewrite the iteration map after changing the view
 on the plane or the size of the image. Also calls `color_itermap()` to
@@ -556,7 +630,8 @@ pub unsafe extern fn redraw(
     x_pixels: usize, y_pixels: usize,
     re: f64, im: f64,
     img_width: f64,
-    use_polynomial_iterator: bool
+    use_polynomial_iterator: bool,
+    smooth: f32,
 ) {
     DRAW_PARAMS = DrawParams {
         xpix: if x_pixels > MAX_WIDTH  { MAX_WIDTH  } else { x_pixels },
@@ -567,6 +642,9 @@ pub unsafe extern fn redraw(
             true  => IteratorType::Polynomial,
             false => IteratorType::Mandelbrot,
         },
+        smooth_frac: if smooth < 0.05 { None }
+                     else if smooth > 0.99 { Some(1.0) }
+                     else { Some(smooth) },
     };
     
     iterate(&mut DRAW_PARAMS, &mut ITERMAP, CURRENT_COLORMAP_LENGTH,
@@ -576,6 +654,10 @@ pub unsafe extern fn redraw(
         &ITERMAP, &COLOR_MAP, &mut IMAGE, DEFAULT_COLOR,
         DRAW_PARAMS.xpix * DRAW_PARAMS.ypix, CURRENT_COLORMAP_LENGTH
     );
+    
+    if let Some(f) = DRAW_PARAMS.smooth_frac {
+        smooth_image(&DRAW_PARAMS, f, &mut IMAGE);
+    }
 }
 
 /**
@@ -595,9 +677,12 @@ pub unsafe extern fn recolor() {
         &ITERMAP, &COLOR_MAP, &mut IMAGE, DEFAULT_COLOR,
         DRAW_PARAMS.xpix * DRAW_PARAMS.ypix, CURRENT_COLORMAP_LENGTH
     );
+    if let Some(f) = DRAW_PARAMS.smooth_frac {
+        smooth_image(&DRAW_PARAMS, f, &mut IMAGE);
+    }
 }
 
-/* Debugging stuff that isn't necessary once it's been debugged.
+/* Debugging stuff that isn't necessary once it's been debugged. */
 
 extern { fn dbg(c: char); }
 fn dbg_msg(msg: &str) {
@@ -626,4 +711,3 @@ fn dbg_float(x: f64) {
         dbg_msg("f+"); dbg_num(n);
     }
 }
-*/

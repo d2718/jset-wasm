@@ -3,8 +3,8 @@
 set -euo pipefail
 
 TARGET=wasm32-unknown-unknown
-BINARY=target/$TARGET/release/jset_web.wasm
-OUTPUT=www/jset_web.wasm
+BINARY=target/$TARGET/release/jset_wasm.wasm
+OUTPUT=www/jset_wasm.wasm
 
 cargo build --target $TARGET --release
 
