@@ -554,21 +554,25 @@ fn reiterate(
     }
 }
 
+const RED_MASK:   u32 = 0xFF;
+const GREEN_MASK: u32 = 0xFF_00;
+const BLUE_MASK:  u32 = 0xFF_00_00;
+
 struct PixVal { r: f32, g: f32, b: f32 }
 
 impl PixVal {
     fn from_u32(n: u32) -> Self {
-        let ru = n & 0xFF;
-        let gu = (n & 0xFF_00) >> 8;
-        let bu = (n & 0xFF_00_00) >> 16;
+        let ru =  n & RED_MASK;
+        let gu = (n & GREEN_MASK) >> 8;
+        let bu = (n & BLUE_MASK) >> 16;
         
         PixVal { r: ru as f32, g: gu as f32, b: bu as f32 }
     }
     
     fn to_u32(&self) -> u32 {
-        let rn = self.r as u32;
-        let gn = (self.r as u32) << 8;
-        let bn = (self.r as u32) << 16;
+        let rn =  self.r as u32;
+        let gn = (self.g as u32) << 8;
+        let bn = (self.b as u32) << 16;
         
         rn | gn | bn | 0xFF_00_00_00
     }
